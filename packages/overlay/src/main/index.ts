@@ -56,6 +56,13 @@ app.whenReady().then(() => {
     overlay.setBounds(gameDisplay().bounds);
   });
 
-  if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify(); // needs electron-builder "publish" config
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('error', (error) => console.error('Auto-update failed:', error));
+    void autoUpdater.checkForUpdatesAndNotify().catch((error: Error) => {
+      console.error('Auto-update check failed:', error);
+    });
+  }
 });
 app.on('will-quit', () => globalShortcut.unregisterAll());
