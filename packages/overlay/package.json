@@ -34,7 +34,8 @@
       {
         "provider": "github",
         "owner": "Fries-dev",
-        "repo": "ban-wars"
+        "repo": "ban-wars",
+        "releaseType": "release"
       }
     ],
     "win": {
