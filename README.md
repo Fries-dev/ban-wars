@@ -15,4 +15,4 @@ Free parties get three rotating premium bans in each match's ban vote. Premium p
 
 ## Releases and updates
 
-The packaged Windows app checks the GitHub Releases page for updates when it starts. To publish an update, bump `packages/overlay/package.json`'s version, commit the change, and push a matching version tag (for example, `v0.1.1`). The release workflow builds the installer and publishes it with the update metadata. Existing installations download updates automatically and install them when the app exits.
+The packaged Windows app checks the GitHub Releases page for updates when it starts. To publish an update, bump `packages/overlay/package.json`'s version, commit the change, and push a matching version tag (for example, `v0.1.2`). The release workflow builds the installer and publishes it with the update metadata. Existing installations download updates automatically and install them when the app exits.
