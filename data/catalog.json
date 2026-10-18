@@ -1,0 +1,269 @@
+{
+ "version": 3,
+ "bans": [
+  {
+   "id": "op-no-intel",
+   "category": "operator",
+   "label": "No Intel Ops",
+   "operatorImages": [
+    "dokkaebi.png",
+    "deimos.png",
+    "jackal.png",
+    "lion.png",
+    "iq.png",
+    "zero.png",
+    "valkyrie.png",
+    "pulse.png",
+    "echo.png",
+    "maestro.png",
+    "mozzie.png",
+    "alibi.png",
+    "solis.png"
+   ]
+  },
+  {
+   "id": "op-no-shields",
+   "category": "operator",
+   "label": "No Shield Ops",
+   "premium": true,
+   "operatorImages": [
+    "blitz.png",
+    "montagne.png",
+    "fuze.png",
+    "clash.png",
+    "osa.png",
+    "blackbeard.png"
+   ]
+  },
+  {
+   "id": "op-no-trap",
+   "category": "operator",
+   "label": "No Trap Ops",
+   "operatorImages": [
+    "kapkan.png",
+    "frost.png",
+    "lesion.png",
+    "ela.png",
+    "gridlock.png",
+    "melusi.png",
+    "thorn.png",
+    "fenrir.png"
+   ]
+  },
+  {
+   "id": "op-no-hardbreach",
+   "category": "operator",
+   "label": "No Hard-Breach Ops",
+   "operatorImages": [
+    "thermite.png",
+    "hibana.png",
+    "maverick.png",
+    "ace.svg"
+   ]
+  },
+  {
+   "id": "op-no-anti-gadget",
+   "category": "operator",
+   "label": "No Anti-Gadget Ops",
+   "operatorImages": [
+    "thatcher.png",
+    "twitch.png",
+    "brava.png",
+    "flores.png",
+    "kali.png",
+    "zero.png"
+   ]
+  },
+  {
+   "id": "op-no-roamers",
+   "category": "operator",
+   "label": "No Roamers",
+   "operatorImages": [
+    "caveira.png",
+    "vigil.png",
+    "oryx.png",
+    "ela.png",
+    "alibi.png",
+    "nokk.png"
+   ]
+  },
+  {
+   "id": "op-no-anchors",
+   "category": "operator",
+   "label": "No Anchors",
+   "operatorImages": [
+    "smoke.png",
+    "mute.png",
+    "castle.png",
+    "mira.png",
+    "echo.png",
+    "maestro.png",
+    "kaid.png",
+    "wamai.png",
+    "warden.png",
+    "azami.png",
+    "tachanka.png"
+   ]
+  },
+  {
+   "id": "op-no-healers",
+   "category": "operator",
+   "label": "No Healers",
+   "operatorImages": [
+    "doc.png",
+    "thunderbird.png",
+    "finka.png"
+   ]
+  },
+  {
+   "id": "op-no-area-denial",
+   "category": "operator",
+   "label": "No Area-Denial Ops",
+   "operatorImages": [
+    "smoke.png",
+    "goyo.png",
+    "tachanka.png",
+    "capitao.png",
+    "gridlock.png",
+    "ying.png"
+   ]
+  },
+  {
+   "id": "sg-iron-only",
+   "category": "sights",
+   "label": "Iron Sights Only",
+   "icon": "IS"
+  },
+  {
+   "id": "sg-no-magnified",
+   "category": "sights",
+   "label": "No Magnified Scopes",
+   "icon": "MG"
+  },
+  {
+   "id": "sg-no-holo",
+   "category": "sights",
+   "label": "No Holographic Sights",
+   "icon": "HO"
+  },
+  {
+   "id": "sg-no-reddot",
+   "category": "sights",
+   "label": "No Red Dot Sights",
+   "icon": "RD"
+  },
+  {
+   "id": "sg-no-reflex",
+   "category": "sights",
+   "label": "No Reflex Sights",
+   "icon": "RF"
+  },
+  {
+   "id": "mv-no-ads",
+   "category": "movement",
+   "label": "No Aiming (Hip-Fire Only)",
+   "icon": "AD"
+  },
+  {
+   "id": "mv-no-crouch",
+   "category": "movement",
+   "label": "No Crouch or Prone",
+   "icon": "CR"
+  },
+  {
+   "id": "mv-no-lean",
+   "category": "movement",
+   "label": "No Leaning",
+   "icon": "LN",
+   "premium": true
+  },
+  {
+   "id": "mv-no-sprint",
+   "category": "movement",
+   "label": "No Sprinting",
+   "icon": "SP",
+   "premium": true
+  },
+  {
+   "id": "mv-no-vault",
+   "category": "movement",
+   "label": "No Vaulting",
+   "icon": "VA",
+   "premium": true
+  },
+  {
+   "id": "wp-secondary-only",
+   "category": "weapon",
+   "label": "Secondary Weapon Only",
+   "icon": "2W"
+  },
+  {
+   "id": "wp-no-suppress",
+   "category": "weapon",
+   "label": "No Suppressors",
+   "icon": "SU",
+   "premium": true
+  },
+  {
+   "id": "wp-no-grips",
+   "category": "weapon",
+   "label": "No Grips",
+   "icon": "GR",
+   "premium": true
+  },
+  {
+   "id": "wp-no-lasers",
+   "category": "weapon",
+   "label": "No Lasers",
+   "icon": "LS",
+   "premium": true
+  },
+  {
+   "id": "wp-no-shotguns",
+   "category": "weapon",
+   "label": "No Shotguns",
+   "icon": "SG",
+   "premium": true
+  },
+  {
+   "id": "ut-no-gadget2",
+   "category": "utility",
+   "label": "No Secondary Gadgets",
+   "icon": "G2"
+  },
+  {
+   "id": "ut-no-breach",
+   "category": "utility",
+   "label": "No Hard Breaching",
+   "icon": "BR"
+  },
+  {
+   "id": "ut-no-drone",
+   "category": "utility",
+   "label": "No Drone After Prep",
+   "icon": "DR",
+   "premium": true
+  },
+  {
+   "id": "ut-no-dshield",
+   "category": "utility",
+   "label": "No Deployable Shields",
+   "icon": "DS",
+   "premium": true
+  },
+  {
+   "id": "cm-no-ping",
+   "category": "comms",
+   "label": "No Pinging",
+   "icon": "PG",
+   "premium": true
+  },
+  {
+   "id": "cm-no-voice",
+   "category": "comms",
+   "label": "No Voice Chat (Pings Only)",
+   "icon": "VX",
+   "premium": true
+  }
+ ]
+}
