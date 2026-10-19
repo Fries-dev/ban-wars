@@ -45,3 +45,13 @@ Email sign-in supports resending a signup confirmation and requesting a password
 ## Releases and updates
 
 The packaged Windows app checks the GitHub Releases page for updates when it starts. To publish an update, bump `packages/overlay/package.json`'s version, commit the change, and push a matching version tag (for example, version `0.1.14` with tag `v0.1.14`). The version in the package and tag must match; changing only the tag will not make the app update. The release workflow builds the installer and publishes it with the update metadata. Existing installations download updates automatically and install them when the app exits.
+
+### Sharing the installer in Discord
+
+The Electron installer is larger than Discord's 10 MB upload limit. Build the small downloader launcher with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-discord-launcher.ps1
+```
+
+Upload `packages\overlay\dist\Ban-Wars-Discord-Launcher.exe` instead. When opened, it downloads the latest installer from the public GitHub release, checks its SHA-256 digest, and starts the installer. The recipient needs an internet connection; the launcher itself does not contain the app.

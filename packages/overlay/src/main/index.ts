@@ -73,7 +73,10 @@ function toggleInteractive() {
 }
 
 app.whenReady().then(() => {
-  if (!hasSingleInstanceLock) return;
+  if (!hasSingleInstanceLock) {
+    app.quit();
+    return;
+  }
   if (process.defaultApp) {
     app.setAsDefaultProtocolClient('banwars', process.execPath, [app.getAppPath()]);
   } else {
