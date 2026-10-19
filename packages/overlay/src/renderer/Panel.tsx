@@ -118,7 +118,7 @@ export default function Panel() {
   const [authLoaded, setAuthLoaded] = useState(!supabase);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const processedAuthCallbacks = useRef(new Set<string>());
-  const [score, setScore] = useState<[number, number]>([0, 0]);
+  const score: [number, number] = [0, 0];
   const [displays, setDisplays] = useState<Awaited<ReturnType<typeof window.bw.displays>>>([]);
   useEffect(() => { window.bw.displays().then(setDisplays); }, []);
   useEffect(() => {
@@ -466,17 +466,10 @@ export default function Panel() {
               <button className="btn gold small" onClick={() => call('party:reset')}>Reset</button>
             </div>
             {party.phase === 'inMatch' && (
-              <>
-                <div className="label">FINAL SCORE (TEAM A – TEAM B)</div>
-                <div className="row">
-                  <input type="number" min={0} value={score[0]} onChange={(e) => setScore([+e.target.value, score[1]])} />
-                  <input type="number" min={0} value={score[1]} onChange={(e) => setScore([score[0], +e.target.value])} />
-                </div>
-                <div className="row">
-                  <button className="btn green small" onClick={() => call('match:result', { winner: 'A', score })}>Team A won</button>
-                  <button className="btn green small" onClick={() => call('match:result', { winner: 'B', score })}>Team B won</button>
-                </div>
-              </>
+              <div className="row">
+                <button className="btn green small" onClick={() => call('match:result', { winner: 'A', score })}>Team A won</button>
+                <button className="btn green small" onClick={() => call('match:result', { winner: 'B', score })}>Team B won</button>
+              </div>
             )}
             <div className="row">
               <div><div className="label">MERCY MARGIN</div><input type="number" min={1} max={13} value={party.settings.mercyMargin} onChange={(e) => call('party:settings', { mercyMargin: +e.target.value })} /></div>
