@@ -22,14 +22,14 @@ function mulberry32(a: number) {
 }
 export const makeRng = (seed: string) => mulberry32(xmur3(seed)());
 
-const FREE_PREMIUM_BANS_PER_MATCH = 3;
+const FREE_PREMIUM_BANS_PER_GAME = 3;
 
-/** Bans a party of this tier is allowed to pick for a given match. */
-export function allowedPool(catalog: BanDef[], tier: Tier, seed: string, matchNo: number): BanDef[] {
+/** Bans a party of this tier is allowed to pick throughout the current party game. */
+export function allowedPool(catalog: BanDef[], tier: Tier, seed: string): BanDef[] {
   if (tier === 'premium') return catalog;
 
   const premium = catalog.filter((b) => b.premium);
-  if (premium.length <= FREE_PREMIUM_BANS_PER_MATCH) return catalog;
+  if (premium.length <= FREE_PREMIUM_BANS_PER_GAME) return catalog;
 
   const shuffled = [...premium];
   const rng = makeRng(`${seed}:premium-rotation`);
@@ -38,9 +38,7 @@ export function allowedPool(catalog: BanDef[], tier: Tier, seed: string, matchNo
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const start = (Math.max(0, matchNo - 1) * FREE_PREMIUM_BANS_PER_MATCH) % shuffled.length;
-  const featured = new Set(Array.from({ length: FREE_PREMIUM_BANS_PER_MATCH },
-    (_, i) => shuffled[(start + i) % shuffled.length].id));
+  const featured = new Set(shuffled.slice(0, FREE_PREMIUM_BANS_PER_GAME).map((ban) => ban.id));
   return catalog.filter((b) => !b.premium || featured.has(b.id));
 }
 

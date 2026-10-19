@@ -4,17 +4,17 @@ import { allowedPool, isMercy, tallyVotes } from './ban-engine.js';
 import catalogFile from '../../../data/catalog.json' with { type: 'json' };
 
 const catalog = catalogFile.bans as BanDef[];
-const freeIds = allowedPool(catalog, 'free', 'test-party', 1).map((b) => b.id);
+const freeIds = allowedPool(catalog, 'free', 'test-party').map((b) => b.id);
 
 describe('catalog', () => {
   it('has unique ids', () => expect(new Set(catalog.map((b) => b.id)).size).toBe(catalog.length));
   it('free tier still has operator and sight bans', () => {
-    const cats = new Set(allowedPool(catalog, 'free', 'test-party', 1).map((b) => b.category));
+    const cats = new Set(allowedPool(catalog, 'free', 'test-party').map((b) => b.category));
     expect(cats.has('operator')).toBe(true);
     expect(cats.has('sights')).toBe(true);
   });
   it('premium sees everything, free does not', () => {
-    expect(allowedPool(catalog, 'premium', 'test-party', 1).length).toBe(catalog.length);
+    expect(allowedPool(catalog, 'premium', 'test-party').length).toBe(catalog.length);
     expect(freeIds.length).toBeLessThan(catalog.length);
   });
   it('operator catalog contains only image-free archetype bans', () => {
@@ -33,19 +33,14 @@ describe('catalog', () => {
     expect(operatorBans.every((b) => b.operatorImages && b.operatorImages.length > 0)).toBe(true);
     expect(catalog.every((b) => !('img' in b))).toBe(true);
   });
-  it('rotates three premium bans each match and covers the premium catalog', () => {
+  it('keeps the same three seeded premium bans for the whole party game', () => {
     const premiumIds = catalog.filter((b) => b.premium).map((b) => b.id);
-    const matches = [1, 2, 3, 4].map((matchNo) =>
-      allowedPool(catalog, 'free', 'rotation-test', matchNo)
-        .filter((b) => b.premium)
-        .map((b) => b.id),
-    );
+    const allowed = allowedPool(catalog, 'free', 'rotation-test');
+    const featured = allowed.filter((ban) => ban.premium).map((ban) => ban.id);
 
-    expect(matches.every((ids) => ids.length === 3)).toBe(true);
-    expect(new Set(matches.map((ids) => ids.join(','))).size).toBe(matches.length);
-    expect(new Set(matches.flat()).size).toBe(premiumIds.length);
-    expect(allowedPool(catalog, 'free', 'rotation-test', 1))
-      .toEqual(allowedPool(catalog, 'free', 'rotation-test', 1));
+    expect(featured).toHaveLength(3);
+    expect(featured.every((id) => premiumIds.includes(id))).toBe(true);
+    expect(allowed).toEqual(allowedPool(catalog, 'free', 'rotation-test'));
   });
 });
 

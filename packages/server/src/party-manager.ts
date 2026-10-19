@@ -60,7 +60,7 @@ export class PartyManager {
       })),
       vote: p.vote && {
         winner: p.vote.winner, catalog: this.catalog,
-        availableBanIds: allowedPool(this.catalog, p.tier, p.seed, p.matchNo).map((b) => b.id),
+        availableBanIds: allowedPool(this.catalog, p.tier, p.seed).map((b) => b.id),
         deadline: p.vote.deadline,
         tally: [...p.vote.ballots.values()].reduce<Record<string, number>>((t, id) => ({ ...t, [id]: (t[id] ?? 0) + 1 }), {}),
         votesIn: p.vote.ballots.size, votesNeeded: eligible,
@@ -224,7 +224,7 @@ export class PartyManager {
     const p = this.parties.get(code); const rec = p?.players.get(playerId);
     if (!p || !rec || !p.vote) return fail('No vote open');
     if (rec.role !== 'player' || rec.team !== p.vote.winner) return fail('Only the winning team votes');
-    const pool = allowedPool(this.catalog, p.tier, p.seed, p.matchNo);
+    const pool = allowedPool(this.catalog, p.tier, p.seed);
     if (!pool.some((b) => b.id === banId)) return fail('That ban is not available this game');
     p.vote.ballots.set(playerId, banId);
     const need = [...p.players.values()].filter((x) => x.role === 'player' && x.team === p.vote!.winner).length;
@@ -235,7 +235,7 @@ export class PartyManager {
   private finalizeVote(p: Party) {
     const v = p.vote; if (!v) return;
     clearTimeout(v.timer);
-    const pool = allowedPool(this.catalog, p.tier, p.seed, p.matchNo).map((b) => b.id);
+    const pool = allowedPool(this.catalog, p.tier, p.seed).map((b) => b.id);
     const id = tallyVotes([...v.ballots.values()], `${p.seed}:${p.matchNo}:pick`, pool);
     const loser = other(v.winner);
     const ban = this.catalog.find((b) => b.id === id);

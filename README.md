@@ -23,7 +23,7 @@ Before publishing a Windows release, add these **repository Actions variables** 
 
 The release workflow requires these values and embeds them in the packaged app. For local development, put the Supabase variables in `packages/overlay/.env` and run the server locally; the desktop app defaults to `http://localhost:3001`. The server keeps parties in memory, so restarting/redeploying it ends active parties.
 
-Free parties get three rotating premium bans in each match's ban vote. Premium parties can use the full ban catalog.
+Free parties get three randomly selected premium bans for the party game; the selection stays the same across matches and rerolls when the host resets the party. Premium parties can use the full ban catalog.
 
 Party invites can be copied as a code or as a web link. Opening the invite link redirects to the Ban Wars app and fills in the party code; if the app is not installed, the page links to the latest installer. The lobby shows up to 10 recent match results (up to 20 are retained for the party lifetime, including across a host reset). Rejoin credentials are encrypted with the operating system's secure storage so the app can attempt to rejoin after a restart while the server still retains the party. Settings include overlay scale/position, colorblind colors, and sound mute/volume; vote start, bans, and unbans have distinct sound cues.
 

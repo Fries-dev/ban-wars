@@ -46,6 +46,30 @@ describe('PartyManager accumulated bans', () => {
     expect(manager.snapshot(created.code)?.history).toHaveLength(2);
   });
 
+  it('keeps the free premium-ban selection stable across matches in a party game', () => {
+    const manager = new PartyManager(catalog, {
+      state: vi.fn(),
+      event: vi.fn(),
+      to: vi.fn(),
+    });
+    const created = manager.create('Host', 'free', 'host-socket');
+    if (!created.ok) throw new Error(created.error);
+
+    const playRound = () => {
+      expect(manager.startMatch(created.code, created.playerId).ok).toBe(true);
+      expect(manager.reportResult(created.code, created.playerId, 'A', [1, 0]).ok).toBe(true);
+      const availableBanIds = manager.snapshot(created.code)?.vote?.availableBanIds;
+      if (!availableBanIds) throw new Error('Expected a vote pool for the active match');
+      expect(manager.castVote(created.code, created.playerId, availableBanIds[0]).ok).toBe(true);
+      return availableBanIds;
+    };
+
+    const firstMatchPool = playRound();
+    const secondMatchPool = playRound();
+
+    expect(secondMatchPool).toEqual(firstMatchPool);
+  });
+
   it('tracks lobby ready state and clears it when a match starts', () => {
     const manager = new PartyManager(catalog, {
       state: vi.fn(),
