@@ -32,6 +32,7 @@ function createPanel() {
     width: 380, height: 720, minWidth: 340, backgroundColor: '#4a4a4a', title: `Ban Wars v${app.getVersion()}`, autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
   });
+  panel.webContents.on('page-title-updated', (event) => event.preventDefault());
   load(panel, 'panel');
   panel.on('closed', () => app.quit());
 }
