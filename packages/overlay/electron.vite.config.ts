@@ -12,5 +12,10 @@ export default defineConfig({
     define: { 'process.env.BW_SERVER': JSON.stringify(serverUrl) }
   },
   preload: { plugins: [externalizeDepsPlugin({ exclude: ['@banwars/shared'] })] },
-  renderer: { root: 'src/renderer', envDir: '../..', plugins: [react()] }
+  renderer: {
+    root: 'src/renderer',
+    envDir: '../..',
+    plugins: [react()],
+    define: { 'import.meta.env.VITE_BW_SERVER': JSON.stringify(serverUrl) }
+  }
 });

@@ -2,6 +2,7 @@ import type { PartyView } from '@banwars/shared';
 type Sub<T> = (cb: (d: T) => void) => () => void;
 declare global {
   interface ImportMetaEnv {
+    readonly VITE_BW_SERVER: string;
     readonly VITE_SUPABASE_URL?: string;
     readonly VITE_SUPABASE_ANON_KEY?: string;
   }
@@ -23,6 +24,9 @@ declare global {
       getAuthCallback: () => Promise<string | null>;
       clearAuthCallback: (url: string) => Promise<void>;
       onAuthCallback: Sub<string>;
+      getPendingPartyCode: () => Promise<string | null>;
+      clearPendingPartyCode: (code: string) => Promise<void>;
+      onPartyInvite: Sub<string>;
       copyText: (text: string) => Promise<void>;
       onResetOverlayPosition: Sub<void>;
       resetOverlayPosition: () => Promise<void>;

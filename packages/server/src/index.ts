@@ -10,11 +10,49 @@ const catalogFile = JSON.parse(readFileSync(new URL('../../../data/catalog.json'
 const tierFor = (_accountToken?: string): Tier => 'free';
 
 const http = createServer((req, res) => {
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  if (req.method === 'GET' && url.pathname === '/join') {
+    const code = url.searchParams.get('code')?.toUpperCase() ?? '';
+    if (!/^BW-[23456789A-HJ-NP-Z]{4}$/.test(code)) {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8', 'x-content-type-options': 'nosniff' });
+      return res.end('Invalid Ban Wars invite code.');
+    }
+    const appLink = `banwars://join?code=${code}`;
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+    });
+    return res.end(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join Ban Wars party ${code}</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#242424;color:#fff;font:16px "Segoe UI",Arial,sans-serif}
+    main{max-width:440px;margin:24px;padding:32px;text-align:center;background:#383838;border-radius:16px}
+    a{display:inline-block;margin:12px;padding:12px 20px;border-radius:8px;background:#d6953a;color:#fff;font-weight:700;text-decoration:none}
+    p{color:#ddd;line-height:1.5}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Join Ban Wars</h1>
+    <p>Opening Ban Wars for party <strong>${code}</strong>…</p>
+    <a href="${appLink}">Open Ban Wars</a>
+    <p>If you don't have Ban Wars yet, <a href="https://github.com/Fries-dev/ban-wars/releases/latest">download it here</a>.</p>
+  </main>
+  <script>window.location.href=${JSON.stringify(appLink)};</script>
+</body>
+</html>`);
+  }
   if (req.url === '/catalog') {                         // remotely updatable catalog endpoint
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     return res.end(JSON.stringify(catalogFile));
   }
-  if (req.url === '/health') { res.writeHead(200); return res.end('ok'); }
+  if (url.pathname === '/health') { res.writeHead(200); return res.end('ok'); }
   res.writeHead(404).end();
 });
 

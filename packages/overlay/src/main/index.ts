@@ -7,6 +7,7 @@ import { startSync } from './sync';
 const SERVER_URL = process.env.BW_SERVER ?? 'http://localhost:3001';
 let overlay: BrowserWindow; let panel: BrowserWindow; let interactive = false;
 let pendingAuthCallback: string | null = null;
+let pendingPartyCode: string | null = null;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 function handleAuthCallback(url: string) {
@@ -20,13 +21,40 @@ function handleAuthCallback(url: string) {
   }
 }
 
+function handlePartyInvite(url: string) {
+  try {
+    const parsed = new URL(url);
+    const code = parsed.searchParams.get('code')?.toUpperCase() ?? '';
+    if (parsed.protocol !== 'banwars:' || parsed.hostname !== 'join' || !/^BW-[23456789A-HJ-NP-Z]{4}$/.test(code)) return;
+    pendingPartyCode = code;
+    if (panel && !panel.isDestroyed()) {
+      panel.webContents.send('bw:party-invite', code);
+      panel.show();
+      panel.focus();
+    }
+  } catch {
+    console.warn('Ignoring invalid party invite URL');
+  }
+}
+
+function handleProtocolUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'banwars:') return;
+    if (parsed.hostname === 'auth' && parsed.pathname === '/callback') handleAuthCallback(url);
+    else if (parsed.hostname === 'join') handlePartyInvite(url);
+  } catch {
+    console.warn('Ignoring invalid Ban Wars URL');
+  }
+}
+
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  handleAuthCallback(url);
+  handleProtocolUrl(url);
 });
 app.on('second-instance', (_event, commandLine) => {
-  const callback = commandLine.find((arg) => arg.startsWith('banwars://auth/callback'));
-  if (callback) handleAuthCallback(callback);
+  const protocolUrl = commandLine.find((arg) => arg.startsWith('banwars://'));
+  if (protocolUrl) handleProtocolUrl(protocolUrl);
   if (panel && !panel.isDestroyed()) { panel.show(); panel.focus(); }
 });
 
@@ -99,6 +127,10 @@ app.whenReady().then(() => {
   ipcMain.handle('bw:clearAuthCallback', (_event, url: string) => {
     if (pendingAuthCallback === url) pendingAuthCallback = null;
   });
+  ipcMain.handle('bw:getPendingPartyCode', () => pendingPartyCode);
+  ipcMain.handle('bw:clearPendingPartyCode', (_event, code: string) => {
+    if (pendingPartyCode === code) pendingPartyCode = null;
+  });
   ipcMain.handle('bw:copyText', (_event, text: unknown) => {
     if (typeof text !== 'string' || !text.trim()) throw new TypeError('Clipboard text must be a non-empty string');
     clipboard.writeText(text);
@@ -114,8 +146,8 @@ app.whenReady().then(() => {
     overlay.setBounds(gameDisplay().bounds);
   });
 
-  const initialAuthCallback = process.argv.find((arg) => arg.startsWith('banwars://auth/callback'));
-  if (initialAuthCallback) handleAuthCallback(initialAuthCallback);
+  const initialProtocolUrl = process.argv.find((arg) => arg.startsWith('banwars://'));
+  if (initialProtocolUrl) handleProtocolUrl(initialProtocolUrl);
 
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;

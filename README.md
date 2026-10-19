@@ -25,7 +25,7 @@ The release workflow requires these values and embeds them in the packaged app. 
 
 Free parties get three rotating premium bans in each match's ban vote. Premium parties can use the full ban catalog.
 
-Party invites can be copied as a code or a share message. The lobby shows up to 10 recent match results (up to 20 are retained for the party lifetime, including across a host reset). Rejoin credentials are encrypted with the operating system's secure storage so the app can attempt to rejoin after a restart while the server still retains the party. Settings include overlay scale/position, colorblind colors, and sound mute/volume; vote start, bans, and unbans have distinct sound cues.
+Party invites can be copied as a code or as a web link. Opening the invite link redirects to the Ban Wars app and fills in the party code; if the app is not installed, the page links to the latest installer. The lobby shows up to 10 recent match results (up to 20 are retained for the party lifetime, including across a host reset). Rejoin credentials are encrypted with the operating system's secure storage so the app can attempt to rejoin after a restart while the server still retains the party. Settings include overlay scale/position, colorblind colors, and sound mute/volume; vote start, bans, and unbans have distinct sound cues.
 
 Players can mark themselves ready in the lobby after joining a team. Ready status is informational, clears when a match starts or a player changes teams, and does not prevent the host from starting. Match history can be copied from the lobby as a plain-text results summary.
 

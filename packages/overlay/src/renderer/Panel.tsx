@@ -169,6 +169,23 @@ export default function Panel() {
     return () => { unsubscribe(); subscription.unsubscribe(); };
   }, []);
 
+  useEffect(() => {
+    const openInvite = (inviteCode: string) => {
+      setCode(inviteCode);
+      setErr('');
+      setScreen('join');
+      void window.bw.clearPendingPartyCode(inviteCode);
+    };
+    const unsubscribe = window.bw.onPartyInvite(openInvite);
+    void window.bw.getPendingPartyCode().then((inviteCode) => {
+      if (inviteCode) openInvite(inviteCode);
+    }).catch((error: unknown) => {
+      console.error('Could not load party invite:', error);
+      setErr(error instanceof Error ? error.message : 'Could not load party invite.');
+    });
+    return unsubscribe;
+  }, []);
+
   const saveNick = (v: string) => { setNick(v); localStorage.setItem('bw.nick', v); };
   const go = (s: Screen) => { setErr(''); setScreen(s); };
   const call = async (ev: string, payload: object = {}) => {
@@ -186,7 +203,7 @@ export default function Panel() {
       setInviteCopied(feedback);
       window.setTimeout(() => setInviteCopied(false), 1800);
     } catch (error) {
-      setErr(error instanceof Error ? `Could not copy invite code: ${error.message}` : 'Could not copy invite code.');
+      setErr(error instanceof Error ? `Could not copy text to clipboard: ${error.message}` : 'Could not copy text to clipboard.');
     }
   };
   const signInWithProvider = async (provider: Provider) => {
@@ -303,10 +320,11 @@ export default function Panel() {
 
   const self = party?.players.find((p) => p.id === me);
   const isHost = !!party && party.hostId === me;
-  const copyShareMessage = (inviteCode: string) => copyInvite(
-    `Join my Ban Wars party!\nInvite code: ${inviteCode}\nIn Ban Wars, choose Input-Code and enter this code.`,
-    'Invite copied!',
-  );
+  const copyInviteLink = (inviteCode: string) => {
+    const inviteUrl = new URL('/join', import.meta.env.VITE_BW_SERVER);
+    inviteUrl.searchParams.set('code', inviteCode);
+    return copyInvite(inviteUrl.toString(), 'Invite link copied!');
+  };
   const copyMatchSummary = () => {
     const winsA = party?.history.filter((match) => match.winner === 'A').length ?? 0;
     const winsB = party?.history.filter((match) => match.winner === 'B').length ?? 0;
@@ -385,8 +403,8 @@ export default function Panel() {
             <span className="code">{party.code}</span>
             <div className="copy-hint">{inviteCopied || 'Click to copy invite code'}</div>
           </button>
-          <button className="btn gold small invite-share" onClick={() => void copyShareMessage(party.code)}>
-            {inviteCopied === 'Invite copied!' ? 'Invite copied!' : 'Copy share message'}
+          <button className="btn gold small invite-share" onClick={() => void copyInviteLink(party.code)}>
+            {inviteCopied === 'Invite link copied!' ? 'Invite link copied!' : 'Copy invite link'}
           </button>
           <div className="muted" style={{ textAlign: 'center' }}>
             {party.phase.toUpperCase()} · Match #{party.matchNo + 1}
