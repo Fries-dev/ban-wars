@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('bw', {
   clearPendingPartyCode: (code: string) => ipcRenderer.invoke('bw:clearPendingPartyCode', code),
   onPartyInvite: sub('bw:party-invite'),
   copyText: (text: string) => ipcRenderer.invoke('bw:copyText', text),
+  panelVersion: () => ipcRenderer.invoke('bw:panelVersion'),
+  panelControl: (action: 'minimize' | 'close') => ipcRenderer.invoke('bw:panelControl', action),
   onResetOverlayPosition: sub('bw:reset-overlay-position'),
   resetOverlayPosition: () => ipcRenderer.invoke('bw:resetOverlayPosition'),
   displays: () => ipcRenderer.invoke('bw:displays'),

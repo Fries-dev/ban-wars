@@ -98,11 +98,12 @@ function startSync(serverUrl, windows) {
   electron.ipcMain.handle("bw:getConn", () => socket.connected);
   electron.ipcMain.handle("bw:getState", () => lastState);
 }
-const SERVER_URL = "https://ban-wars-test.up.railway.app";
+const SERVER_URL = "http://localhost:3001";
 let overlay;
 let panel;
 let interactive = false;
 let pendingAuthCallback = null;
+let pendingPartyCode = null;
 const hasSingleInstanceLock = electron.app.requestSingleInstanceLock();
 function handleAuthCallback(url) {
   try {
@@ -114,13 +115,38 @@ function handleAuthCallback(url) {
     console.warn("Ignoring invalid authentication callback URL");
   }
 }
+function handlePartyInvite(url) {
+  try {
+    const parsed = new URL(url);
+    const code = parsed.searchParams.get("code")?.toUpperCase() ?? "";
+    if (parsed.protocol !== "banwars:" || parsed.hostname !== "join" || !/^BW-[23456789A-HJ-NP-Z]{4}$/.test(code)) return;
+    pendingPartyCode = code;
+    if (panel && !panel.isDestroyed()) {
+      panel.webContents.send("bw:party-invite", code);
+      panel.show();
+      panel.focus();
+    }
+  } catch {
+    console.warn("Ignoring invalid party invite URL");
+  }
+}
+function handleProtocolUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "banwars:") return;
+    if (parsed.hostname === "auth" && parsed.pathname === "/callback") handleAuthCallback(url);
+    else if (parsed.hostname === "join") handlePartyInvite(url);
+  } catch {
+    console.warn("Ignoring invalid Ban Wars URL");
+  }
+}
 electron.app.on("open-url", (event, url) => {
   event.preventDefault();
-  handleAuthCallback(url);
+  handleProtocolUrl(url);
 });
 electron.app.on("second-instance", (_event, commandLine) => {
-  const callback = commandLine.find((arg) => arg.startsWith("banwars://auth/callback"));
-  if (callback) handleAuthCallback(callback);
+  const protocolUrl = commandLine.find((arg) => arg.startsWith("banwars://"));
+  if (protocolUrl) handleProtocolUrl(protocolUrl);
   if (panel && !panel.isDestroyed()) {
     panel.show();
     panel.focus();
@@ -161,8 +187,12 @@ function createPanel() {
     width: 380,
     height: 720,
     minWidth: 340,
+    minHeight: 500,
     backgroundColor: "#4a4a4a",
     title,
+    frame: false,
+    resizable: false,
+    fullscreenable: false,
     autoHideMenuBar: true,
     webPreferences: { preload: node_path.join(__dirname, "../preload/index.js"), contextIsolation: true, sandbox: false }
   });
@@ -181,7 +211,10 @@ function toggleInteractive() {
   overlay.webContents.send("bw:interactive", interactive);
 }
 electron.app.whenReady().then(() => {
-  if (!hasSingleInstanceLock) return;
+  if (!hasSingleInstanceLock) {
+    electron.app.quit();
+    return;
+  }
   if (process.defaultApp) {
     electron.app.setAsDefaultProtocolClient("banwars", process.execPath, [electron.app.getAppPath()]);
   } else {
@@ -208,9 +241,20 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle("bw:clearAuthCallback", (_event, url) => {
     if (pendingAuthCallback === url) pendingAuthCallback = null;
   });
+  electron.ipcMain.handle("bw:getPendingPartyCode", () => pendingPartyCode);
+  electron.ipcMain.handle("bw:clearPendingPartyCode", (_event, code) => {
+    if (pendingPartyCode === code) pendingPartyCode = null;
+  });
   electron.ipcMain.handle("bw:copyText", (_event, text) => {
     if (typeof text !== "string" || !text.trim()) throw new TypeError("Clipboard text must be a non-empty string");
     electron.clipboard.writeText(text);
+  });
+  electron.ipcMain.handle("bw:panelVersion", () => electron.app.getVersion());
+  electron.ipcMain.handle("bw:panelControl", (event, action) => {
+    if (event.sender !== panel.webContents) throw new Error("Panel window controls may only be used by the panel");
+    if (action === "minimize") panel.minimize();
+    else if (action === "close") panel.close();
+    else throw new TypeError("Unknown panel window action");
   });
   electron.ipcMain.handle("bw:resetOverlayPosition", () => {
     if (!overlay.isDestroyed()) overlay.webContents.send("bw:reset-overlay-position");
@@ -220,8 +264,8 @@ electron.app.whenReady().then(() => {
     node_fs.writeFileSync(settingsFile(), JSON.stringify({ ...loadSettings(), displayId: id }));
     overlay.setBounds(gameDisplay().bounds);
   });
-  const initialAuthCallback = process.argv.find((arg) => arg.startsWith("banwars://auth/callback"));
-  if (initialAuthCallback) handleAuthCallback(initialAuthCallback);
+  const initialProtocolUrl = process.argv.find((arg) => arg.startsWith("banwars://"));
+  if (initialProtocolUrl) handleProtocolUrl(initialProtocolUrl);
   if (electron.app.isPackaged) {
     electronUpdater.autoUpdater.autoDownload = true;
     electronUpdater.autoUpdater.autoInstallOnAppQuit = true;

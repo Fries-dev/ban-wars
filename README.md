@@ -42,6 +42,8 @@ The app opens provider sign-in in the system browser. The Windows installer regi
 
 Email sign-in supports resending a signup confirmation and requesting a password-reset email. Reset links return to the app so a new password can be set. Supabase email rate limits and SMTP delivery settings apply.
 
+The app footer contains draft Privacy Policy and Terms of Service pages. Complete and review the privacy contact, payment provider, subscription price and renewal, cancellation, and refund details before enabling Premium subscription sales.
+
 ## Releases and updates
 
 The packaged Windows app checks the GitHub Releases page for updates when it starts. To publish an update, bump `packages/overlay/package.json`'s version, commit the change, and push a matching version tag (for example, version `0.1.14` with tag `v0.1.14`). The version in the package and tag must match; changing only the tag will not make the app update. The release workflow builds the installer and publishes it with the update metadata. Existing installations download updates automatically and install them when the app exits.

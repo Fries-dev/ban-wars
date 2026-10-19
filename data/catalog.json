@@ -12,13 +12,16 @@
     "lion.png",
     "iq.png",
     "zero.png",
+    "iana.png",
+    "grim.png",
     "valkyrie.png",
     "pulse.png",
     "echo.png",
     "maestro.png",
     "mozzie.png",
     "alibi.png",
-    "solis.png"
+    "solis.png",
+    "skopos.png"
    ]
   },
   {
@@ -71,7 +74,13 @@
     "brava.png",
     "flores.png",
     "kali.png",
-    "zero.png"
+    "zero.png",
+    "iq.png",
+    "sledge.png",
+    "mute.png",
+    "bandit.png",
+    "kaid.png",
+    "tubarao.png"
    ]
   },
   {
@@ -84,7 +93,9 @@
     "oryx.png",
     "ela.png",
     "alibi.png",
-    "nokk.png"
+    "nokk.png",
+    "solis.png",
+    "pulse.png"
    ]
   },
   {
@@ -102,7 +113,11 @@
     "wamai.png",
     "warden.png",
     "azami.png",
-    "tachanka.png"
+    "tachanka.png",
+    "doc.png",
+    "rook.png",
+    "tubarao.png",
+    "skopos.png"
    ]
   },
   {
@@ -125,50 +140,58 @@
     "tachanka.png",
     "capitao.png",
     "gridlock.png",
-    "ying.png"
+    "ying.png",
+    "sens.png"
    ]
   },
   {
    "id": "sg-iron-only",
    "category": "sights",
    "label": "Iron Sights Only",
-   "icon": "IS"
+   "icon": "IS",
+   "premium": true
   },
   {
    "id": "sg-no-magnified",
    "category": "sights",
    "label": "No Magnified Scopes",
-   "icon": "MG"
+   "icon": "MG",
+   "premium": true
   },
   {
    "id": "sg-no-holo",
    "category": "sights",
    "label": "No Holographic Sights",
-   "icon": "HO"
+   "icon": "HO",
+   "premium": true
   },
   {
    "id": "sg-no-reddot",
    "category": "sights",
    "label": "No Red Dot Sights",
-   "icon": "RD"
+   "icon": "RD",
+   "premium": true
   },
   {
    "id": "sg-no-reflex",
    "category": "sights",
    "label": "No Reflex Sights",
-   "icon": "RF"
+   "icon": "RF",
+   "premium": true
   },
   {
    "id": "mv-no-ads",
    "category": "movement",
    "label": "No Aiming (Hip-Fire Only)",
-   "icon": "AD"
+   "icon": "AD",
+   "premium": true
   },
   {
    "id": "mv-no-crouch",
    "category": "movement",
    "label": "No Crouch or Prone",
-   "icon": "CR"
+   "icon": "CR",
+   "premium": true
   },
   {
    "id": "mv-no-lean",
@@ -195,7 +218,8 @@
    "id": "wp-secondary-only",
    "category": "weapon",
    "label": "Secondary Weapon Only",
-   "icon": "2W"
+   "icon": "2W",
+   "premium": true
   },
   {
    "id": "wp-no-suppress",
@@ -229,13 +253,15 @@
    "id": "ut-no-gadget2",
    "category": "utility",
    "label": "No Secondary Gadgets",
-   "icon": "G2"
+   "icon": "G2",
+   "premium": true
   },
   {
    "id": "ut-no-breach",
    "category": "utility",
    "label": "No Hard Breaching",
-   "icon": "BR"
+   "icon": "BR",
+   "premium": true
   },
   {
    "id": "ut-no-drone",

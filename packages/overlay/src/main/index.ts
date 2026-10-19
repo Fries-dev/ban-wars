@@ -81,7 +81,8 @@ function createOverlay() {
 function createPanel() {
   const title = `Ban Wars v.${app.getVersion()}`;
   panel = new BrowserWindow({
-    width: 380, height: 720, minWidth: 340, backgroundColor: '#4a4a4a', title, autoHideMenuBar: true,
+    width: 380, height: 720, minWidth: 340, minHeight: 500, backgroundColor: '#4a4a4a', title,
+    frame: false, resizable: false, fullscreenable: false, autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
   });
   panel.webContents.on('page-title-updated', (event) => {
@@ -134,6 +135,13 @@ app.whenReady().then(() => {
   ipcMain.handle('bw:copyText', (_event, text: unknown) => {
     if (typeof text !== 'string' || !text.trim()) throw new TypeError('Clipboard text must be a non-empty string');
     clipboard.writeText(text);
+  });
+  ipcMain.handle('bw:panelVersion', () => app.getVersion());
+  ipcMain.handle('bw:panelControl', (event, action: unknown) => {
+    if (event.sender !== panel.webContents) throw new Error('Panel window controls may only be used by the panel');
+    if (action === 'minimize') panel.minimize();
+    else if (action === 'close') panel.close();
+    else throw new TypeError('Unknown panel window action');
   });
   ipcMain.handle('bw:resetOverlayPosition', () => {
     if (!overlay.isDestroyed()) overlay.webContents.send('bw:reset-overlay-position');

@@ -1,30 +1,34 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Provider } from '@supabase/supabase-js';
 import type { TeamId } from '@banwars/shared';
+import logoImage from '../../../../icons/logo/logo.png';
 import { cue } from './sound';
 import { readPrefs, useBw } from './useBw';
 import { supabase } from './auth';
 
-type Screen = 'home' | 'create' | 'code' | 'join' | 'signin' | 'profile' | 'settings';
+type Screen = 'home' | 'create' | 'code' | 'join' | 'signin' | 'profile' | 'settings' | 'privacy' | 'terms';
+type PanelAction = 'minimize' | 'close';
 
 const css = `
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#4a4a4a;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;color:#fff;user-select:none}
-.app{position:relative;height:100vh;overflow:hidden;background:#7d7d7d}
-.c{position:absolute;border-radius:50%}
-.c1{width:190px;height:190px;left:-60px;top:-60px;background:#8e8c89}
-.c2{width:260px;height:260px;left:-140px;top:120px;background:#4b4b4b}
-.c3{width:230px;height:230px;right:-90px;top:-30px;background:#908e8b}
-.c4{width:240px;height:240px;right:-140px;top:190px;background:#a09d9a}
-.c5{width:300px;height:300px;right:-130px;top:330px;background:#3f3f3f}
-.c6{width:220px;height:220px;left:-90px;bottom:-70px;background:#6a6a6a}
-.c7{width:300px;height:300px;right:-60px;bottom:-190px;background:#5c5c5c}
-.content{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;padding:28px 24px;overflow-y:auto}
-.profile{position:absolute;z-index:3;top:14px;right:14px;background:none;border:0;padding:0;cursor:pointer}
-.offline{position:absolute;z-index:4;left:0;right:0;bottom:0;background:#c0392b;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:8px}
-.logo{position:relative;width:160px;height:160px;border-radius:26px;background:linear-gradient(135deg,#8a8a8a,#5a5a5a);border:7px solid #636363;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-top:18px;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15),0 10px 20px rgba(0,0,0,.22)}
-.logo::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.35),transparent 35%),linear-gradient(135deg,rgba(255,255,255,.18),transparent 50%)}
-.logo-monogram{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:112px;height:112px;border:4px solid rgba(255,255,255,.8);border-radius:50%;color:#fff;font-size:54px;font-weight:1000;letter-spacing:-.12em;text-indent:-.12em;text-shadow:0 4px 8px rgba(0,0,0,.35);box-shadow:0 0 0 8px rgba(0,0,0,.12),inset 0 0 0 2px rgba(0,0,0,.12)}
+.app{position:relative;display:flex;flex-direction:column;height:100vh;overflow:hidden;background:#5b5b5b}
+.pattern{position:absolute;inset:0;width:100%;height:100%;filter:brightness(0);opacity:.07;pointer-events:none}
+.titlebar{position:relative;z-index:5;display:flex;align-items:center;height:38px;min-height:38px;padding-left:10px;background:#494949;border:1px solid rgba(255,255,255,.16);-webkit-app-region:drag}
+.titlebar-title{flex:1;font-size:13px;font-weight:700}
+.window-controls{display:flex;height:100%;-webkit-app-region:no-drag}
+.window-control{width:46px;border:0;background:transparent;color:#eee;font:inherit;font-size:15px;cursor:pointer}
+.window-control:hover{background:rgba(255,255,255,.15)}
+.window-control.close:hover{background:#c42b1c}
+.content{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:12px 24px;overflow-y:auto}
+.profile{position:absolute;z-index:3;top:46px;right:14px;background:none;border:0;padding:0;cursor:pointer}
+.offline{position:absolute;z-index:4;left:0;right:0;bottom:34px;background:#c0392b;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:8px}
+.footer{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;height:32px;min-height:32px;padding:0 9px;background:rgba(0,0,0,.12);border-top:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:700;color:#aaa}
+.footer-links{display:flex;gap:10px}
+.footer button{padding:0;border:0;background:none;color:#c8c8c8;font:inherit;cursor:pointer}
+.footer button:hover{color:#fff;text-decoration:underline}
+.logo{width:min(280px,100%);height:126px;display:flex;align-items:center;justify-content:center;margin-top:18px;flex:none}
+.logo img{display:block;width:100%;height:100%;object-fit:contain}
 .stack{display:flex;flex-direction:column;align-items:center;gap:26px;margin-top:56px}
 .btn{width:150px;padding:9px 0;border-radius:10px;border:3px solid;font:inherit;font-size:21px;font-weight:800;color:#fff;text-shadow:0 2px 2px rgba(0,0,0,.35);cursor:pointer;box-shadow:0 3px 6px rgba(0,0,0,.25)}
 .btn:active{transform:translateY(1px)} .btn:disabled{opacity:.55;cursor:default}
@@ -59,6 +63,12 @@ input[type=text],input[type=email],input[type=password],input:not([type]),input[
 .tm{font-weight:900;padding:0 8px} .tm.A{color:#ffd37a} .tm.B{color:#9cc9ff}
 .muted{color:#e3e3e3;font-size:12px}
 .chk{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600} .chk input{width:auto}
+.legal{width:100%;max-width:600px}
+.legal h2{margin-top:4px}
+.legal .panel{line-height:1.5;user-select:text}
+.legal .panel h3{margin:4px 0 0;font-size:15px}
+.legal .panel p{margin:0}
+.legal-notice{padding:9px 12px;border:1px solid #e8b45e;border-radius:9px;background:rgba(0,0,0,.2);color:#ffe0a3;font-size:12px;font-weight:700}
 `;
 
 const Profile = () => (
@@ -72,19 +82,50 @@ const Profile = () => (
 function Logo() {
   return (
     <div className="logo" aria-label="Ban Wars logo">
-      <div className="logo-monogram" aria-hidden="true">BW
-      </div>
+      <img src={logoImage} alt="Ban Wars" />
     </div>
   );
 }
 
-function Shell({ children, online, everConnected, onProfile }: { children: ReactNode; online: boolean; everConnected: boolean; onProfile?: () => void }) {
+function Shell({ children, online, everConnected, version, onWindowControl, onLegal, onProfile }: {
+  children: ReactNode;
+  online: boolean;
+  everConnected: boolean;
+  version: string;
+  onWindowControl: (action: PanelAction) => void;
+  onLegal: (screen: 'privacy' | 'terms') => void;
+  onProfile?: () => void;
+}) {
   return (
     <div className="app"><style>{css}</style>
-      {['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'].map((c) => <div key={c} className={`c ${c}`} />)}
+      <div className="titlebar">
+        <span className="titlebar-title">Ban Wars{version && ` v.${version}`}</span>
+        <div className="window-controls">
+          <button className="window-control" aria-label="Minimize" title="Minimize" onClick={() => onWindowControl('minimize')}>−</button>
+          <button className="window-control close" aria-label="Close" title="Close" onClick={() => onWindowControl('close')}>×</button>
+        </div>
+      </div>
+      <svg className="pattern" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <pattern id="bw-watermark" width="140" height="160" patternUnits="userSpaceOnUse">
+            <image href={logoImage} x="5" y="3" width="76" height="34" />
+            <image href={logoImage} x="55" y="43" width="76" height="34" />
+            <image href={logoImage} x="5" y="83" width="76" height="34" />
+            <image href={logoImage} x="55" y="123" width="76" height="34" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#bw-watermark)" />
+      </svg>
       {onProfile && <button className="profile" onClick={onProfile} title="Profile & settings"><Profile /></button>}
       <div className="content">{children}</div>
       {!online && <div className="offline">{everConnected ? 'Connection lost. Reconnecting to your party…' : 'Connecting to the Ban Wars server…'}</div>}
+      <footer className="footer">
+        <span>Made by Kevin Fries</span>
+        <div className="footer-links">
+          <button onClick={() => onLegal('privacy')}>Privacy Policy</button>
+          <button onClick={() => onLegal('terms')}>Terms of Service</button>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -105,6 +146,8 @@ function TeamPicker({ team, setTeam }: { team: TeamId; setTeam: (t: TeamId) => v
 export default function Panel() {
   const { party, me, prefs, setPrefs, online, everConnected } = useBw();
   const [screen, setScreen] = useState<Screen>('home');
+  const previousScreen = useRef<Screen>('home');
+  const [version, setVersion] = useState('');
   const [nick, setNick] = useState(localStorage.getItem('bw.nick') ?? '');
   const [team, setTeam] = useState<TeamId>('A');
   const [code, setCode] = useState('');
@@ -121,6 +164,12 @@ export default function Panel() {
   const score: [number, number] = [0, 0];
   const [displays, setDisplays] = useState<Awaited<ReturnType<typeof window.bw.displays>>>([]);
   useEffect(() => { window.bw.displays().then(setDisplays); }, []);
+  useEffect(() => {
+    void window.bw.panelVersion().then(setVersion).catch((error: unknown) => {
+      console.error('Could not read app version:', error);
+      setErr(error instanceof Error ? error.message : 'Could not read app version.');
+    });
+  }, []);
   useEffect(() => {
     const client = supabase;
     if (!client) return;
@@ -187,7 +236,11 @@ export default function Panel() {
   }, []);
 
   const saveNick = (v: string) => { setNick(v); localStorage.setItem('bw.nick', v); };
-  const go = (s: Screen) => { setErr(''); setScreen(s); };
+  const go = (s: Screen) => {
+    setErr('');
+    if (s !== 'privacy' && s !== 'terms') previousScreen.current = s;
+    setScreen(s);
+  };
   const call = async (ev: string, payload: object = {}) => {
     const r = await window.bw.emit(ev, payload);
     setErr(r.ok ? '' : r.error ?? 'Something went wrong');
@@ -339,10 +392,53 @@ export default function Panel() {
   const resetOverlayPosition = () => {
     void window.bw.resetOverlayPosition();
   };
+  const onWindowControl = (action: PanelAction) => {
+    void window.bw.panelControl(action).catch((error: unknown) => {
+      console.error('Could not control panel window:', error);
+      setErr(error instanceof Error ? error.message : 'Could not control panel window.');
+    });
+  };
+  const shellProps = { online, everConnected, version, onWindowControl, onLegal: (target: 'privacy' | 'terms') => go(target) };
+
+  if (screen === 'privacy' || screen === 'terms')
+    return (
+      <Shell {...shellProps}>
+        <div className="legal">
+          <button className="back" onClick={() => go(previousScreen.current)}>‹ Back</button>
+          <h2>{screen === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}</h2>
+          <div className="panel">
+            <div className="legal-notice">DRAFT FOR REVIEW — finalize the details below before publishing or accepting subscription payments.</div>
+            {screen === 'privacy' ? (
+              <>
+                <h3>Information used by Ban Wars</h3>
+                <p>Ban Wars uses the player name, team, party activity, and match results needed to run multiplayer parties. If account sign-in is enabled, Supabase Auth processes account information such as your email address.</p>
+                <h3>Local storage and party sessions</h3>
+                <p>App preferences are stored on your device. A party rejoin session is encrypted using your operating system's secure storage. Party state is held by the Ban Wars server in memory while the server is running.</p>
+                <h3>Payments and Premium</h3>
+                <p>This app build does not include subscription checkout or collect payment card details. Before enabling monthly Premium purchases, identify the payment provider and document what billing information it processes, how long it retains it, and how users can contact you about privacy.</p>
+                <h3>Sharing and contact</h3>
+                <p>Party members can see player names, teams, and activity in their party. Supabase and the Ban Wars server provide account and multiplayer services. Add a monitored privacy contact address and any applicable data-request process before release.</p>
+              </>
+            ) : (
+              <>
+                <h3>Using the service</h3>
+                <p>Ban Wars provides tools for organizing multiplayer parties and match ban selections. Keep your account credentials private, use a player name you are permitted to use, and do not disrupt the service or other players.</p>
+                <h3>Premium subscriptions — setup required</h3>
+                <p>The current app build does not implement subscription checkout, renewal, or cancellation. Before selling Premium, specify the seller's legal name and contact, the plan price and currency, monthly renewal terms, when charges occur, how and when cancellation takes effect, refund rules, and any trial or tax terms. Show these details before purchase and use the actual payment provider's cancellation process.</p>
+                <h3>Availability and account actions</h3>
+                <p>The service may be updated or temporarily unavailable. Accounts or parties that abuse the service may be restricted. Explain any material limits on Premium features here before taking payment.</p>
+                <h3>Legal review</h3>
+                <p>This draft is general product text, not legal advice. Have the final terms reviewed for your location and the locations where you offer subscriptions, including applicable consumer and recurring-payment requirements.</p>
+              </>
+            )}
+          </div>
+        </div>
+      </Shell>
+    );
 
   if (screen === 'profile')
     return (
-      <Shell online={online} everConnected={everConnected}>
+      <Shell {...shellProps}>
         <button className="back" onClick={() => go('home')}>‹ Back</button>
         <h2>Profile</h2>
         <div className="panel">
@@ -372,7 +468,7 @@ export default function Panel() {
   // ---------- settings (reachable from the profile icon) ----------
   if (screen === 'settings')
     return (
-      <Shell online={online} everConnected={everConnected}>
+      <Shell {...shellProps}>
         <button className="back" onClick={() => go('profile')}>‹ Profile</button>
         <h2>Settings</h2>
         <div className="panel">
@@ -396,7 +492,7 @@ export default function Panel() {
   // ---------- in a party: lobby ----------
   if (party)
     return (
-      <Shell online={online} everConnected={everConnected} onProfile={() => go('profile')}>
+      <Shell {...shellProps} onProfile={() => go('profile')}>
         <h2 style={{ marginTop: 34 }}>{party.tier === 'premium' ? 'Premium Party' : 'Party'}</h2>
         <div className="panel" style={{ marginTop: 4 }}>
           <button className="code-copy" onClick={() => void copyInvite(party.code, 'Code copied!')} title="Copy invite code to clipboard" aria-label={`Copy invite code ${party.code}`}>
@@ -485,7 +581,7 @@ export default function Panel() {
   // ---------- not in a party ----------
   const logo = <Logo />;
   return (
-    <Shell online={online} everConnected={everConnected} onProfile={() => go('profile')}>
+    <Shell {...shellProps} onProfile={() => go('profile')}>
       {screen === 'home' && (
         <>
           {logo}

@@ -28,6 +28,8 @@ declare global {
       clearPendingPartyCode: (code: string) => Promise<void>;
       onPartyInvite: Sub<string>;
       copyText: (text: string) => Promise<void>;
+      panelVersion: () => Promise<string>;
+      panelControl: (action: 'minimize' | 'close') => Promise<void>;
       onResetOverlayPosition: Sub<void>;
       resetOverlayPosition: () => Promise<void>;
       displays: () => Promise<{ id: number; label: string; selected: boolean }[]>;
