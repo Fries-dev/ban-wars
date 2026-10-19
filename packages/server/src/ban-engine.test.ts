@@ -42,6 +42,14 @@ describe('catalog', () => {
     expect(featured.every((id) => premiumIds.includes(id))).toBe(true);
     expect(allowed).toEqual(allowedPool(catalog, 'free', 'rotation-test'));
   });
+  it('excludes bans already applied to either team', () => {
+    const firstPool = allowedPool(catalog, 'free', 'unique-ban-test');
+    const excludedId = firstPool[0].id;
+    const nextPool = allowedPool(catalog, 'free', 'unique-ban-test', [excludedId]);
+
+    expect(nextPool.some((ban) => ban.id === excludedId)).toBe(false);
+    expect(nextPool).toHaveLength(firstPool.length - 1);
+  });
 });
 
 describe('isMercy', () => {

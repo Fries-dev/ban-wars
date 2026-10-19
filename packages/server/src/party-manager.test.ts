@@ -54,20 +54,55 @@ describe('PartyManager accumulated bans', () => {
     });
     const created = manager.create('Host', 'free', 'host-socket');
     if (!created.ok) throw new Error(created.error);
+    const premiumIds = new Set(catalog.filter((ban) => ban.premium).map((ban) => ban.id));
 
     const playRound = () => {
       expect(manager.startMatch(created.code, created.playerId).ok).toBe(true);
       expect(manager.reportResult(created.code, created.playerId, 'A', [1, 0]).ok).toBe(true);
       const availableBanIds = manager.snapshot(created.code)?.vote?.availableBanIds;
       if (!availableBanIds) throw new Error('Expected a vote pool for the active match');
-      expect(manager.castVote(created.code, created.playerId, availableBanIds[0]).ok).toBe(true);
+      const nonPremiumBanId = availableBanIds.find((id) => !premiumIds.has(id));
+      if (!nonPremiumBanId) throw new Error('Expected a non-premium ban in the vote pool');
+      expect(manager.castVote(created.code, created.playerId, nonPremiumBanId).ok).toBe(true);
       return availableBanIds;
     };
 
     const firstMatchPool = playRound();
     const secondMatchPool = playRound();
 
-    expect(secondMatchPool).toEqual(firstMatchPool);
+    expect(secondMatchPool?.filter((id) => premiumIds.has(id))).toEqual(firstMatchPool?.filter((id) => premiumIds.has(id)));
+  });
+
+  it('removes applied bans from later vote options and rejects duplicate selections', () => {
+    const manager = new PartyManager(catalog, {
+      state: vi.fn(),
+      event: vi.fn(),
+      to: vi.fn(),
+    });
+    const created = manager.create('Host', 'premium', 'host-socket');
+    if (!created.ok) throw new Error(created.error);
+
+    const finishMatchWithBan = (banId: string) => {
+      expect(manager.startMatch(created.code, created.playerId).ok).toBe(true);
+      expect(manager.reportResult(created.code, created.playerId, 'A', [1, 0]).ok).toBe(true);
+      const vote = manager.snapshot(created.code)?.vote;
+      if (!vote) throw new Error('Expected an active vote');
+      expect(vote.bannedBanIds.includes(banId)).toBe(true);
+      expect(vote.availableBanIds.includes(banId)).toBe(false);
+      expect(manager.castVote(created.code, created.playerId, banId)).toEqual({
+        ok: false,
+        error: 'That ban is already applied or not available this game',
+      });
+      expect(manager.castVote(created.code, created.playerId, vote.availableBanIds[0]).ok).toBe(true);
+    };
+
+    const firstBanId = 'op-no-shields';
+    expect(manager.startMatch(created.code, created.playerId).ok).toBe(true);
+    expect(manager.reportResult(created.code, created.playerId, 'A', [1, 0]).ok).toBe(true);
+    expect(manager.castVote(created.code, created.playerId, firstBanId).ok).toBe(true);
+
+    finishMatchWithBan(firstBanId);
+    expect(manager.snapshot(created.code)?.bans.B.map((ban) => ban.id)).toContain(firstBanId);
   });
 
   it('tracks lobby ready state and clears it when a match starts', () => {

@@ -24,12 +24,13 @@ export const makeRng = (seed: string) => mulberry32(xmur3(seed)());
 
 const FREE_PREMIUM_BANS_PER_GAME = 3;
 
-/** Bans a party of this tier is allowed to pick throughout the current party game. */
-export function allowedPool(catalog: BanDef[], tier: Tier, seed: string): BanDef[] {
-  if (tier === 'premium') return catalog;
+/** Bans a party of this tier may pick throughout the current party game. */
+export function allowedPool(catalog: BanDef[], tier: Tier, seed: string, excludedIds: readonly string[] = []): BanDef[] {
+  const excluded = new Set(excludedIds);
+  if (tier === 'premium') return catalog.filter((ban) => !excluded.has(ban.id));
 
   const premium = catalog.filter((b) => b.premium);
-  if (premium.length <= FREE_PREMIUM_BANS_PER_GAME) return catalog;
+  if (premium.length <= FREE_PREMIUM_BANS_PER_GAME) return catalog.filter((ban) => !excluded.has(ban.id));
 
   const shuffled = [...premium];
   const rng = makeRng(`${seed}:premium-rotation`);
@@ -39,7 +40,7 @@ export function allowedPool(catalog: BanDef[], tier: Tier, seed: string): BanDef
   }
 
   const featured = new Set(shuffled.slice(0, FREE_PREMIUM_BANS_PER_GAME).map((ban) => ban.id));
-  return catalog.filter((b) => !b.premium || featured.has(b.id));
+  return catalog.filter((b) => (!b.premium || featured.has(b.id)) && !excluded.has(b.id));
 }
 
 export function isMercy(score: [number, number], winner: 'A' | 'B', margin: number): boolean {

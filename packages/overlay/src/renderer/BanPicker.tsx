@@ -36,23 +36,25 @@ const css = `
 `;
 
 interface Props {
-  catalog: BanDef[]; availableBanIds: string[]; tally: Record<string, number>;
+  catalog: BanDef[]; availableBanIds: string[]; bannedBanIds: string[]; tally: Record<string, number>;
   myVote: string | null; onPick: (id: string) => void; disabled?: boolean;
 }
 
 /** Folder tabs on top; the selected folder's bans below. Click one ban to vote for it. */
-export default function BanPicker({ catalog, availableBanIds, tally, myVote, onPick, disabled }: Props) {
+export default function BanPicker({ catalog, availableBanIds, bannedBanIds, tally, myVote, onPick, disabled }: Props) {
   const [folder, setFolder] = useState<Category>('operator');
   const [q, setQ] = useState('');
   const available = new Set(availableBanIds);
-  const inFolder = catalog.filter((b) => b.category === folder);
+  const banned = new Set(bannedBanIds);
+  const remaining = catalog.filter((ban) => !banned.has(ban.id));
+  const inFolder = remaining.filter((b) => b.category === folder);
   const items = inFolder.filter((b) => b.label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div className="bp"><style>{css}</style>
       <div className="bp-tabs">
         {FOLDERS.map((f) => (
           <button key={f.id} className={`bp-tab ${folder === f.id ? 'on' : ''}`} onClick={() => { setFolder(f.id); setQ(''); }}>
-            {f.label}<small>{catalog.filter((b) => b.category === f.id).length}</small>
+            {f.label}<small>{remaining.filter((b) => b.category === f.id).length}</small>
           </button>
         ))}
       </div>

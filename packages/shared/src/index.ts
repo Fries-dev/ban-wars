@@ -24,7 +24,8 @@ export interface PlayerView {
 export interface VoteView {
   winner: TeamId;
   catalog: BanDef[];                 // all bans, including locked entries
-  availableBanIds: string[];         // bans unlocked for this party and match
+  availableBanIds: string[];         // unlocked bans not already applied to either team
+  bannedBanIds: string[];            // bans currently applied to either team
   tally: Record<string, number>;     // live vote counts per ban id
   deadline: number;                  // server epoch ms; clients correct with serverNow offset
   votesIn: number; votesNeeded: number;

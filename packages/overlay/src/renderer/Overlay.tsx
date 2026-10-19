@@ -104,7 +104,7 @@ export default function Overlay() {
               </div>
               {iVote && (
                 <>
-                  <BanPicker catalog={vote.catalog} availableBanIds={vote.availableBanIds} tally={vote.tally} myVote={myVote}
+                  <BanPicker catalog={vote.catalog} availableBanIds={vote.availableBanIds} bannedBanIds={vote.bannedBanIds} tally={vote.tally} myVote={myVote}
                     disabled={!interactive} onPick={pick} />
                   {!interactive && <div className="hint" style={{ marginTop: 6, textAlign: 'center' }}>Press F10 to pick here, or pick in the Ban Wars window</div>}
                 </>
