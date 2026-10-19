@@ -18,6 +18,19 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Validate public service configuration
+        shell: pwsh
+        env:
+          BW_SERVER: ${{ vars.BW_SERVER }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if (-not $env:BW_SERVER) { throw "Set the BW_SERVER Actions variable to the public Railway URL before releasing." }
+          if (-not $env:VITE_SUPABASE_URL) { throw "Set the VITE_SUPABASE_URL Actions variable before releasing." }
+          if (-not $env:VITE_SUPABASE_ANON_KEY) { throw "Set the VITE_SUPABASE_ANON_KEY Actions variable before releasing." }
       - run: npm run release --workspace @banwars/overlay
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BW_SERVER: ${{ vars.BW_SERVER }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}

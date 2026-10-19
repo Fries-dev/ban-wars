@@ -18,7 +18,7 @@ export interface Settings {
 
 export interface PlayerView {
   id: string; nick: string; team: TeamId | null;
-  role: 'player' | 'spectator'; connected: boolean;
+  role: 'player' | 'spectator'; connected: boolean; ready: boolean;
 }
 
 export interface VoteView {
@@ -30,12 +30,23 @@ export interface VoteView {
   votesIn: number; votesNeeded: number;
 }
 
+export interface MatchHistoryEntry {
+  matchNo: number;
+  winner: TeamId;
+  score: [number, number];
+  mercy: boolean;
+  bannedTeam: TeamId;
+  ban: BanDef;
+  completedAt: number;
+}
+
 export interface PartyView {
   code: string; hostId: string; tier: Tier; settings: Settings;
   players: PlayerView[]; phase: Phase; matchNo: number;
   bans: Record<TeamId, BanDef[]>;       // accumulated restrictions for each team
   mercyTeam: TeamId | null;             // team holding an unused mercy unban
   lastResult: { winner: TeamId; score: [number, number]; mercy: boolean } | null;
+  history: MatchHistoryEntry[];
   vote: VoteView | null;
   serverNow: number;
 }
@@ -47,6 +58,7 @@ export interface ClientEvents {
   'party:create': { nick: string; accountToken?: string };
   'party:join': { code: string; nick: string; token?: string };
   'party:setTeam': { team: TeamId };
+  'party:setReady': { ready: boolean };
   'party:kick': { playerId: string };
   'party:settings': Partial<Settings>;
   'party:reset': object;

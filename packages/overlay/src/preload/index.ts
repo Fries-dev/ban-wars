@@ -16,6 +16,13 @@ contextBridge.exposeInMainWorld('bw', {
   onConn: sub('bw:conn'),
   onSession: sub('bw:session'),
   onInteractive: sub('bw:interactive'),
+  openAuthUrl: (url: string) => ipcRenderer.invoke('bw:openAuthUrl', url),
+  getAuthCallback: () => ipcRenderer.invoke('bw:getAuthCallback'),
+  clearAuthCallback: (url: string) => ipcRenderer.invoke('bw:clearAuthCallback', url),
+  onAuthCallback: sub('bw:auth-callback'),
+  copyText: (text: string) => ipcRenderer.invoke('bw:copyText', text),
+  onResetOverlayPosition: sub('bw:reset-overlay-position'),
+  resetOverlayPosition: () => ipcRenderer.invoke('bw:resetOverlayPosition'),
   displays: () => ipcRenderer.invoke('bw:displays'),
   setDisplay: (id: number) => ipcRenderer.invoke('bw:setDisplay', id),
 });

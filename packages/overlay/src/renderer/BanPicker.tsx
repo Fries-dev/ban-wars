@@ -23,7 +23,7 @@ const css = `
 .bp-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
 .bp-copy small{font-size:10px;font-weight:500;line-height:1.35;opacity:.82}
 .bp-operators{display:flex;flex-wrap:wrap;gap:5px 0;padding-right:8px}
-.bp-operators img{position:relative;width:30px;height:30px;flex:none;margin-right:-8px;object-fit:contain;border:2px solid rgba(255,255,255,.8);border-radius:50%;background:#454545}
+.bp-operators img{position:relative;width:30px;height:30px;flex:none;margin-right:-8px;object-fit:contain}
 .bp-item .n{margin-left:auto;font-size:11px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.25)}
 .bp-item:not(.lock):not(:disabled){cursor:pointer}
 .bp-item:not(.lock):not(:disabled):hover{border-color:var(--g1,#72d672)}

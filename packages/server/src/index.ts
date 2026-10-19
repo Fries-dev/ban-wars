@@ -58,6 +58,7 @@ io.on('connection', (socket) => {
   });
 
   guard('party:setTeam', (c, id, p) => pm.setTeam(c, id, p.team));
+  guard('party:setReady', (c, id, p) => pm.setReady(c, id, p.ready));
   guard('party:kick', (c, id, p) => pm.kick(c, id, p.playerId));
   guard('party:settings', (c, id, p) => pm.setSettings(c, id, p));
   guard('party:reset', (c, id) => pm.reset(c, id));

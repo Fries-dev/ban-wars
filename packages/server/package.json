@@ -1,6 +1,6 @@
 {
   "name": "@banwars/server", "version": "0.1.0", "private": true, "type": "module",
   "scripts": { "dev": "tsx watch src/index.ts", "start": "tsx src/index.ts", "test": "vitest run" },
-  "dependencies": { "@banwars/shared": "*", "socket.io": "^4.7.5" },
-  "devDependencies": { "tsx": "^4.19.0", "typescript": "^5.5.0", "vitest": "^2.0.0", "@types/node": "^20.0.0" }
+  "dependencies": { "@banwars/shared": "*", "socket.io": "^4.7.5", "tsx": "^4.19.0" },
+  "devDependencies": { "typescript": "^5.5.0", "vitest": "^2.0.0", "@types/node": "^20.0.0" }
 }

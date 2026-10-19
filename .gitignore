@@ -1,1 +1,9 @@
 /node_modules
+.env
+.env.*
+!.env.example
+/packages/overlay/out
+/packages/overlay/out
+/packages/overlay/dist
+/packages/overlay/out
+/packages/overlay/out

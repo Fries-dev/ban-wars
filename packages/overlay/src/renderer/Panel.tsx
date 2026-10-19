@@ -1,9 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Provider } from '@supabase/supabase-js';
 import type { TeamId } from '@banwars/shared';
-import { useBw, useNow } from './useBw';
-import BanPicker from './BanPicker';
+import { cue } from './sound';
+import { readPrefs, useBw } from './useBw';
+import { supabase } from './auth';
 
-type Screen = 'home' | 'create' | 'code' | 'join' | 'signin' | 'settings';
+type Screen = 'home' | 'create' | 'code' | 'join' | 'signin' | 'profile' | 'settings';
 
 const css = `
 *{box-sizing:border-box}
@@ -34,7 +36,7 @@ html,body{margin:0;height:100%;background:#4a4a4a;font-family:'Segoe UI','Helvet
 h2{margin:12px 0 4px;font-size:26px;font-weight:800;text-shadow:0 2px 2px rgba(0,0,0,.3)}
 .sub{color:#e3e3e3;font-size:13px;margin-bottom:10px;text-align:center}
 .panel{width:100%;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.18);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-top:10px}
-input[type=text],input:not([type]),input[type=number],select{width:100%;background:rgba(255,255,255,.92);color:#222;border:3px solid #636363;border-radius:10px;padding:10px 12px;font:inherit;font-size:17px;font-weight:600;outline:none}
+input[type=text],input[type=email],input[type=password],input:not([type]),input[type=number],select{width:100%;background:rgba(255,255,255,.92);color:#222;border:3px solid #636363;border-radius:10px;padding:10px 12px;font:inherit;font-size:17px;font-weight:600;outline:none}
 .codein{text-align:center;letter-spacing:.2em;font-size:26px;font-weight:800;text-transform:uppercase}
 .label{font-size:12px;font-weight:700;letter-spacing:.1em;color:#ececec}
 .teams{display:flex;gap:10px}
@@ -43,6 +45,16 @@ input[type=text],input:not([type]),input[type=number],select{width:100%;backgrou
 .err{width:100%;background:rgba(192,57,43,.9);border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;margin-top:10px}
 .row{display:flex;gap:8px;align-items:center} .row>*{flex:1}
 .code{font-size:34px;font-weight:900;letter-spacing:.18em;text-align:center}
+.code-copy{width:100%;padding:4px 8px;background:none;border:0;color:inherit;font:inherit;cursor:pointer}
+.code-copy:hover{color:#ffe0a3}
+.copy-hint{font-size:12px;font-weight:600;text-align:center;color:#e3e3e3}
+.invite-share{width:100%}
+.history-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.15);font-size:13px}
+.history-row:last-child{border-bottom:0}
+.history-result{font-weight:800}
+.ready-state{font-size:11px;font-weight:800;letter-spacing:.04em}
+.ready-state.yes{color:#a8f0a8}
+.ready-state.no{color:#ffd37a}
 .pl{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.15);font-size:15px;font-weight:600}
 .tm{font-weight:900;padding:0 8px} .tm.A{color:#ffd37a} .tm.B{color:#9cc9ff}
 .muted{color:#e3e3e3;font-size:12px}
@@ -60,18 +72,19 @@ const Profile = () => (
 function Logo() {
   return (
     <div className="logo" aria-label="Ban Wars logo">
-      <div className="logo-monogram" aria-hidden="true">BW</div>
+      <div className="logo-monogram" aria-hidden="true">BW
+      </div>
     </div>
   );
 }
 
-function Shell({ children, online, onProfile }: { children: ReactNode; online: boolean; onProfile?: () => void }) {
+function Shell({ children, online, everConnected, onProfile }: { children: ReactNode; online: boolean; everConnected: boolean; onProfile?: () => void }) {
   return (
     <div className="app"><style>{css}</style>
       {['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'].map((c) => <div key={c} className={`c ${c}`} />)}
       {onProfile && <button className="profile" onClick={onProfile} title="Profile & settings"><Profile /></button>}
       <div className="content">{children}</div>
-      {!online && <div className="offline">Server offline. Start it with: npm run dev:server</div>}
+      {!online && <div className="offline">{everConnected ? 'Connection lost. Reconnecting to your party…' : 'Connecting to the Ban Wars server…'}</div>}
     </div>
   );
 }
@@ -90,18 +103,71 @@ function TeamPicker({ team, setTeam }: { team: TeamId; setTeam: (t: TeamId) => v
 }
 
 export default function Panel() {
-  const { party, me, prefs, setPrefs, online, offset } = useBw();
-  const now = useNow();
-  const [myVote, setMyVote] = useState<string | null>(null);
+  const { party, me, prefs, setPrefs, online, everConnected } = useBw();
   const [screen, setScreen] = useState<Screen>('home');
   const [nick, setNick] = useState(localStorage.getItem('bw.nick') ?? '');
   const [team, setTeam] = useState<TeamId>('A');
   const [code, setCode] = useState('');
+  const [inviteCopied, setInviteCopied] = useState<string | false>(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [score, setScore] = useState<[number, number]>([7, 0]);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(!supabase);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const processedAuthCallbacks = useRef(new Set<string>());
+  const [score, setScore] = useState<[number, number]>([0, 0]);
   const [displays, setDisplays] = useState<Awaited<ReturnType<typeof window.bw.displays>>>([]);
   useEffect(() => { window.bw.displays().then(setDisplays); }, []);
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    const finishAuth = async (url: string) => {
+      if (processedAuthCallbacks.current.has(url)) return;
+      processedAuthCallbacks.current.add(url);
+      const callback = new URL(url);
+      const code = callback.searchParams.get('code');
+      if (!code) {
+        setErr(callback.searchParams.get('error_description') ?? callback.searchParams.get('error') ?? 'The sign-in link did not include an authorization code.');
+        await window.bw.clearAuthCallback(url);
+        return;
+      }
+      try {
+        const { error } = await client.auth.exchangeCodeForSession(code);
+        setErr(error ? error.message : 'Signed in successfully.');
+      } catch (error) {
+        setErr(error instanceof Error ? error.message : 'Could not complete sign-in.');
+      } finally {
+        await window.bw.clearAuthCallback(url);
+      }
+    };
+    const unsubscribe = window.bw.onAuthCallback((url) => { void finishAuth(url); });
+    void window.bw.getAuthCallback().then((url) => { if (url) void finishAuth(url); });
+    void client.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error('Could not load account session:', error);
+        setErr(error.message);
+      }
+      setAuthEmail(data.session?.user.email ?? null);
+      setAuthLoaded(true);
+    }).catch((error: unknown) => {
+      console.error('Could not load account session:', error);
+      setErr(error instanceof Error ? error.message : 'Could not load account session.');
+      setAuthLoaded(true);
+    });
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+      setAuthEmail(session?.user.email ?? null);
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+        setScreen('signin');
+        setErr('Choose a new password for your account.');
+      }
+      setAuthLoaded(true);
+    });
+    return () => { unsubscribe(); subscription.unsubscribe(); };
+  }, []);
 
   const saveNick = (v: string) => { setNick(v); localStorage.setItem('bw.nick', v); };
   const go = (s: Screen) => { setErr(''); setScreen(s); };
@@ -112,7 +178,112 @@ export default function Panel() {
   };
   const pref = (k: string, v: string) => {
     localStorage.setItem(k, v);
-    setPrefs({ scale: Number(localStorage.getItem('bw.scale') ?? 1), colorblind: localStorage.getItem('bw.cb') === '1', mute: localStorage.getItem('bw.mute') === '1' });
+    setPrefs(readPrefs());
+  };
+  const copyInvite = async (text: string, feedback: string) => {
+    try {
+      await window.bw.copyText(text);
+      setInviteCopied(feedback);
+      window.setTimeout(() => setInviteCopied(false), 1800);
+    } catch (error) {
+      setErr(error instanceof Error ? `Could not copy invite code: ${error.message}` : 'Could not copy invite code.');
+    }
+  };
+  const signInWithProvider = async (provider: Provider) => {
+    if (!supabase) return setErr('Sign-in is not configured. Add the Supabase URL and anon key to packages/overlay/.env.');
+    setBusy(true);
+    setErr('');
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: 'banwars://auth/callback', skipBrowserRedirect: true },
+      });
+      if (error) setErr(error.message);
+      else if (data.url) {
+        const result = await window.bw.openAuthUrl(data.url);
+        if (!result.ok) setErr(result.error ?? 'Could not open the sign-in page.');
+      } else setErr('The sign-in provider did not return a URL.');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not start sign-in.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const signInWithEmail = async () => {
+    if (!supabase) return setErr('Sign-in is not configured. Add the Supabase URL and anon key to packages/overlay/.env.');
+    setBusy(true);
+    setErr('');
+    try {
+      const result = authMode === 'signUp'
+        ? await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: 'banwars://auth/callback' } })
+        : await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (result.error) setErr(result.error.message);
+      else if (authMode === 'signUp' && !result.data.session) setErr('Account created. Check your email to confirm your account.');
+      else setErr(authMode === 'signUp' ? 'Account created and signed in.' : 'Signed in successfully.');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not sign in.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resendConfirmation = async () => {
+    if (!supabase) return setErr('Sign-in is not configured.');
+    if (!email.trim()) return setErr('Enter your email address first.');
+    setBusy(true);
+    setErr('');
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: 'banwars://auth/callback' } });
+      setErr(error ? error.message : 'If this account still needs confirmation, a new email has been requested. Check your inbox and spam folder.');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not resend confirmation email.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const requestPasswordReset = async () => {
+    if (!supabase) return setErr('Sign-in is not configured.');
+    if (!email.trim()) return setErr('Enter your email address first.');
+    setBusy(true);
+    setErr('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'banwars://auth/callback' });
+      setErr(error ? error.message : 'If an account exists for that email, a password-reset link has been requested. Check your inbox and spam folder.');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not request a password reset.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const updatePassword = async () => {
+    if (!supabase) return setErr('Sign-in is not configured.');
+    if (password.length < 8) return setErr('Use a password with at least 8 characters.');
+    setBusy(true);
+    setErr('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) setErr(error.message);
+      else {
+        setPassword('');
+        setPasswordRecovery(false);
+        setErr('Password updated successfully.');
+      }
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not update password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const signOut = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      setErr(error ? error.message : 'Signed out.');
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not sign out.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const doCreate = async () => {
@@ -132,17 +303,59 @@ export default function Panel() {
 
   const self = party?.players.find((p) => p.id === me);
   const isHost = !!party && party.hostId === me;
-  const vote = party?.vote ?? null;
-  const iVote = !!vote && self?.role === 'player' && self.team === vote.winner;
-  const secs = vote ? Math.max(0, Math.ceil((vote.deadline - (now + offset)) / 1000)) : 0;
-  useEffect(() => { if (!vote) setMyVote(null); }, [!!vote]);
-  const pick = async (banId: string) => { const r = await call('vote:cast', { banId }); if (r.ok) setMyVote(banId); };
+  const copyShareMessage = (inviteCode: string) => copyInvite(
+    `Join my Ban Wars party!\nInvite code: ${inviteCode}\nIn Ban Wars, choose Input-Code and enter this code.`,
+    'Invite copied!',
+  );
+  const copyMatchSummary = () => {
+    const winsA = party?.history.filter((match) => match.winner === 'A').length ?? 0;
+    const winsB = party?.history.filter((match) => match.winner === 'B').length ?? 0;
+    const rows = party?.history.map((match) =>
+      `Match ${match.matchNo}: Team ${match.winner} won ${match.score.join('-')}; Team ${match.bannedTeam} banned ${match.ban.label}${match.mercy ? ' (mercy)' : ''}`,
+    ) ?? [];
+    return copyInvite(
+      [`Ban Wars party ${party?.code ?? ''} results`, `Team A ${winsA} - ${winsB} Team B`, ...rows].join('\n'),
+      'Results copied!',
+    );
+  };
+  const resetOverlayPosition = () => {
+    void window.bw.resetOverlayPosition();
+  };
+
+  if (screen === 'profile')
+    return (
+      <Shell online={online} everConnected={everConnected}>
+        <button className="back" onClick={() => go('home')}>‹ Back</button>
+        <h2>Profile</h2>
+        <div className="panel">
+          <div className="label">ACCOUNT</div>
+          {!supabase ? <div className="muted">Set up Supabase to enable accounts.</div>
+            : !authLoaded ? <div className="muted">Loading account…</div>
+              : authEmail ? (
+                <>
+                  <div className="muted">Signed in as {authEmail}</div>
+                  <button className="btn grey small" disabled={busy} onClick={() => void signOut()}>{busy ? '...' : 'Sign Out'}</button>
+                </>
+              ) : (
+                <>
+                  <div className="muted">Not signed in</div>
+                  <button className="btn gold small" onClick={() => go('signin')}>Sign In or Create Account</button>
+                </>
+              )}
+          <div className="label">PLAYER NAME</div>
+          <input type="text" placeholder="Name" maxLength={16} value={nick} onChange={(e) => saveNick(e.target.value)} />
+          <div className="muted">This name appears to other players in your party.</div>
+          <button className="btn grey small" onClick={() => go('settings')}>Settings</button>
+        </div>
+        {err && <div className="err">{err}</div>}
+      </Shell>
+    );
 
   // ---------- settings (reachable from the profile icon) ----------
   if (screen === 'settings')
     return (
-      <Shell online={online}>
-        <button className="back" onClick={() => go('home')}>‹ Back</button>
+      <Shell online={online} everConnected={everConnected}>
+        <button className="back" onClick={() => go('profile')}>‹ Profile</button>
         <h2>Settings</h2>
         <div className="panel">
           <div className="label">GAME MONITOR</div>
@@ -153,6 +366,10 @@ export default function Panel() {
           <input type="range" min={0.7} max={1.8} step={0.1} value={prefs.scale} onChange={(e) => pref('bw.scale', e.target.value)} />
           <label className="chk">High-contrast colorblind mode<input type="checkbox" checked={prefs.colorblind} onChange={(e) => pref('bw.cb', e.target.checked ? '1' : '0')} /></label>
           <label className="chk">Mute sound cues<input type="checkbox" checked={prefs.mute} onChange={(e) => pref('bw.mute', e.target.checked ? '1' : '0')} /></label>
+          <div className="label">SOUND VOLUME {Math.round(prefs.volume * 100)}%</div>
+          <input type="range" min={0} max={1} step={0.05} value={prefs.volume} onChange={(e) => pref('bw.volume', e.target.value)} />
+          <button className="btn grey small" onClick={() => cue('vote')}>Test sound</button>
+          <button className="btn grey small" onClick={resetOverlayPosition}>Reset overlay position</button>
           <div className="muted">Run Siege in borderless windowed mode or the overlay can't draw on top. F10 toggles click-through.</div>
         </div>
       </Shell>
@@ -161,10 +378,16 @@ export default function Panel() {
   // ---------- in a party: lobby ----------
   if (party)
     return (
-      <Shell online={online} onProfile={() => go('settings')}>
+      <Shell online={online} everConnected={everConnected} onProfile={() => go('profile')}>
         <h2 style={{ marginTop: 34 }}>{party.tier === 'premium' ? 'Premium Party' : 'Party'}</h2>
         <div className="panel" style={{ marginTop: 4 }}>
-          <div className="code">{party.code}</div>
+          <button className="code-copy" onClick={() => void copyInvite(party.code, 'Code copied!')} title="Copy invite code to clipboard" aria-label={`Copy invite code ${party.code}`}>
+            <span className="code">{party.code}</span>
+            <div className="copy-hint">{inviteCopied || 'Click to copy invite code'}</div>
+          </button>
+          <button className="btn gold small invite-share" onClick={() => void copyShareMessage(party.code)}>
+            {inviteCopied === 'Invite copied!' ? 'Invite copied!' : 'Copy share message'}
+          </button>
           <div className="muted" style={{ textAlign: 'center' }}>
             {party.phase.toUpperCase()} · Match #{party.matchNo + 1}
             {party.lastResult && ` · Last: Team ${party.lastResult.winner} ${party.lastResult.score.join('-')}${party.lastResult.mercy ? ' (MERCY)' : ''}`}
@@ -176,18 +399,14 @@ export default function Panel() {
               ))}
             </div>
           )}
+          {self?.role === 'player' && self.team && party.phase === 'lobby' && (
+            <button className={`btn ${self.ready ? 'green' : 'grey'} small`} onClick={() => call('party:setReady', { ready: !self.ready })}>
+              {self.ready ? 'Ready ✓ · Click to unready' : 'Mark Ready'}
+            </button>
+          )}
           {self?.role === 'spectator' && <div className="muted">Party is full. You are spectating.</div>}
         </div>
         {err && <div className="err">{err}</div>}
-
-        {vote && (
-          <div className="panel">
-            <div className="label">{iVote ? `PICK ONE BAN FOR TEAM ${vote.winner === 'A' ? 'B' : 'A'} · ${secs}s` : `WINNERS ARE CHOOSING YOUR BAN · ${secs}s`}</div>
-            {iVote
-              ? <BanPicker catalog={vote.catalog} availableBanIds={vote.availableBanIds} tally={vote.tally} myVote={myVote} onPick={pick} />
-              : <div className="muted">Votes in: {vote.votesIn}/{vote.votesNeeded}</div>}
-          </div>
-        )}
 
         <div className="panel">
           <div className="label">PLAYERS ({party.players.length})</div>
@@ -195,10 +414,31 @@ export default function Panel() {
             <div className="pl" key={p.id} style={{ opacity: p.connected ? 1 : 0.5 }}>
               <span>{p.nick}{p.id === party.hostId && ' ★'}{p.role === 'spectator' && ' (spec)'}</span>
               <span><span className={`tm ${p.team}`}>{p.team ?? '–'}</span>
+                {p.role === 'player' && <span className={`ready-state ${p.ready ? 'yes' : 'no'}`}>{p.ready ? 'READY' : 'NOT READY'}</span>}
                 {isHost && p.id !== me && <button className="btn gold small" onClick={() => call('party:kick', { playerId: p.id })}>Kick</button>}</span>
             </div>
           ))}
         </div>
+
+        {party.history.length > 0 && (
+          <div className="panel">
+            <div className="label">RECENT MATCH HISTORY</div>
+            <div className="muted">
+              Team A wins: {party.history.filter((match) => match.winner === 'A').length}
+              {' · '}
+              Team B wins: {party.history.filter((match) => match.winner === 'B').length}
+            </div>
+            <button className="btn grey small" disabled={!party.history.length} onClick={() => void copyMatchSummary()}>
+              {inviteCopied === 'Results copied!' ? 'Results copied!' : 'Copy results'}
+            </button>
+            {party.history.slice(0, 10).map((match) => (
+              <div className="history-row" key={`${match.matchNo}-${match.completedAt}`}>
+                <span className="history-result">#{match.matchNo} · Team {match.winner} {match.score.join('-')}</span>
+                <span className="muted">Team {match.bannedTeam}: {match.ban.label}{match.mercy ? ' · MERCY' : ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {isHost && (
           <div className="panel">
@@ -234,7 +474,7 @@ export default function Panel() {
   // ---------- not in a party ----------
   const logo = <Logo />;
   return (
-    <Shell online={online} onProfile={() => go('settings')}>
+    <Shell online={online} everConnected={everConnected} onProfile={() => go('profile')}>
       {screen === 'home' && (
         <>
           {logo}
@@ -294,12 +534,42 @@ export default function Panel() {
           <button className="back" onClick={() => go('home')}>‹ Back</button>
           {logo}
           <div className="panel">
-            <div className="label">NICKNAME</div>
+            {passwordRecovery ? (
+              <>
+                <div className="label">SET A NEW PASSWORD</div>
+                <input type="password" placeholder="New password (8+ characters)" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <button className="btn gold small" disabled={busy || password.length < 8} onClick={() => void updatePassword()}>{busy ? '...' : 'Update Password'}</button>
+              </>
+            ) : authEmail ? (
+              <>
+                <div className="label">SIGNED IN</div>
+                <div className="muted">{authEmail}</div>
+                <button className="btn grey small" disabled={busy} onClick={() => void signOut()}>{busy ? '...' : 'Sign Out'}</button>
+              </>
+            ) : (
+              <>
+                <div className="label">ACCOUNT</div>
+                <div className="row">
+                  <button className="btn grey small" disabled={busy} onClick={() => setAuthMode('signIn')}>Sign In</button>
+                  <button className="btn grey small" disabled={busy} onClick={() => setAuthMode('signUp')}>Create Account</button>
+                </div>
+                <button className="btn grey small" disabled={busy} onClick={() => void signInWithProvider('google')}>Continue with Google</button>
+                <button className="btn grey small" disabled={busy} onClick={() => void signInWithProvider('apple')}>Continue with Apple</button>
+                <div className="label">EMAIL</div>
+                <input type="email" placeholder="Email address" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input type="password" placeholder="Password" autoComplete={authMode === 'signUp' ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <button className="btn gold small" disabled={busy || !email.trim() || !password} onClick={() => void signInWithEmail()}>
+                  {busy ? '...' : authMode === 'signUp' ? 'Create Account' : 'Sign In with Email'}
+                </button>
+                {authMode === 'signUp'
+                  ? <button className="btn grey small" disabled={busy || !email.trim()} onClick={() => void resendConfirmation()}>Resend Confirmation Email</button>
+                  : <button className="btn grey small" disabled={busy || !email.trim()} onClick={() => void requestPasswordReset()}>Forgot Password?</button>}
+              </>
+            )}
+            <div className="label">PLAYER NAME</div>
             <input type="text" placeholder="Name" maxLength={16} value={nick} onChange={(e) => saveNick(e.target.value)} />
-            <button className="btn grey small" disabled>Discord (soon)</button>
-            <button className="btn grey small" disabled>Steam (soon)</button>
-            <button className="btn grey small" disabled>Ubisoft (soon)</button>
           </div>
+          {err && <div className="err">{err}</div>}
           <button className="btn gold" style={{ marginTop: 18 }} onClick={() => go('home')}>Save</button>
         </>
       )}

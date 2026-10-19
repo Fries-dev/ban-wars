@@ -18,6 +18,7 @@ export default function Overlay() {
   const myTeam = party?.players.find((p) => p.id === me)?.team ?? null;
   const teamRef = useRef(myTeam);
   teamRef.current = myTeam;
+  const voteRef = useRef(false);
 
   const show = (text: string, kind: Toast['kind']) => setToast({ id: ++toastId.current, text, kind });
 
@@ -37,6 +38,17 @@ export default function Overlay() {
   }, [toast?.id]);
 
   useEffect(() => { if (!party?.vote) setMyVote(null); }, [!!party?.vote]);
+  useEffect(() => {
+    const voting = !!party?.vote;
+    if (voting && !voteRef.current) cue('vote');
+    voteRef.current = voting;
+  }, [!!party?.vote]);
+
+  useEffect(() => window.bw.onResetOverlayPosition(() => {
+    const reset = { x: 0, y: 0 };
+    setPos(reset);
+    localStorage.setItem('bw.pos', JSON.stringify(reset));
+  }), []);
 
   if (!party || !me) return null;
 

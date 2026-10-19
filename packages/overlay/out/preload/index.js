@@ -15,6 +15,13 @@ electron.contextBridge.exposeInMainWorld("bw", {
   onConn: sub("bw:conn"),
   onSession: sub("bw:session"),
   onInteractive: sub("bw:interactive"),
+  openAuthUrl: (url) => electron.ipcRenderer.invoke("bw:openAuthUrl", url),
+  getAuthCallback: () => electron.ipcRenderer.invoke("bw:getAuthCallback"),
+  clearAuthCallback: (url) => electron.ipcRenderer.invoke("bw:clearAuthCallback", url),
+  onAuthCallback: sub("bw:auth-callback"),
+  copyText: (text) => electron.ipcRenderer.invoke("bw:copyText", text),
+  onResetOverlayPosition: sub("bw:reset-overlay-position"),
+  resetOverlayPosition: () => electron.ipcRenderer.invoke("bw:resetOverlayPosition"),
   displays: () => electron.ipcRenderer.invoke("bw:displays"),
   setDisplay: (id) => electron.ipcRenderer.invoke("bw:setDisplay", id)
 });

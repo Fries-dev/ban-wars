@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -6,6 +6,29 @@ import { startSync } from './sync';
 
 const SERVER_URL = process.env.BW_SERVER ?? 'http://localhost:3001';
 let overlay: BrowserWindow; let panel: BrowserWindow; let interactive = false;
+let pendingAuthCallback: string | null = null;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+function handleAuthCallback(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'banwars:' || parsed.hostname !== 'auth' || parsed.pathname !== '/callback') return;
+    pendingAuthCallback = url;
+    if (panel && !panel.isDestroyed()) panel.webContents.send('bw:auth-callback', url);
+  } catch {
+    console.warn('Ignoring invalid authentication callback URL');
+  }
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleAuthCallback(url);
+});
+app.on('second-instance', (_event, commandLine) => {
+  const callback = commandLine.find((arg) => arg.startsWith('banwars://auth/callback'));
+  if (callback) handleAuthCallback(callback);
+  if (panel && !panel.isDestroyed()) { panel.show(); panel.focus(); }
+});
 
 const settingsFile = () => join(app.getPath('userData'), 'settings.json');
 const loadSettings = (): { displayId?: number } => { try { return JSON.parse(readFileSync(settingsFile(), 'utf8')); } catch { return {}; } };
@@ -50,9 +73,36 @@ function toggleInteractive() {
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
+  if (process.defaultApp) {
+    app.setAsDefaultProtocolClient('banwars', process.execPath, [app.getAppPath()]);
+  } else {
+    app.setAsDefaultProtocolClient('banwars');
+  }
   createOverlay(); createPanel();
   startSync(SERVER_URL, () => [overlay, panel]);
   globalShortcut.register('F10', toggleInteractive); // F10 toggles click-through (use borderless windowed in-game)
+
+  ipcMain.handle('bw:openAuthUrl', async (_event, value: string) => {
+    let url: URL;
+    try { url = new URL(value); } catch { return { ok: false, error: 'Invalid sign-in URL' }; }
+    if (url.protocol !== 'https:' || url.pathname !== '/auth/v1/authorize' || !['google', 'apple'].includes(url.searchParams.get('provider') ?? '')) {
+      return { ok: false, error: 'Unexpected sign-in URL' };
+    }
+    await shell.openExternal(url.toString());
+    return { ok: true };
+  });
+  ipcMain.handle('bw:getAuthCallback', () => pendingAuthCallback);
+  ipcMain.handle('bw:clearAuthCallback', (_event, url: string) => {
+    if (pendingAuthCallback === url) pendingAuthCallback = null;
+  });
+  ipcMain.handle('bw:copyText', (_event, text: unknown) => {
+    if (typeof text !== 'string' || !text.trim()) throw new TypeError('Clipboard text must be a non-empty string');
+    clipboard.writeText(text);
+  });
+  ipcMain.handle('bw:resetOverlayPosition', () => {
+    if (!overlay.isDestroyed()) overlay.webContents.send('bw:reset-overlay-position');
+  });
 
   ipcMain.handle('bw:displays', () =>
     screen.getAllDisplays().map((d, i) => ({ id: d.id, label: `Display ${i + 1} (${d.size.width}x${d.size.height})`, selected: d.id === gameDisplay().id })));
@@ -60,6 +110,9 @@ app.whenReady().then(() => {
     writeFileSync(settingsFile(), JSON.stringify({ ...loadSettings(), displayId: id }));
     overlay.setBounds(gameDisplay().bounds);
   });
+
+  const initialAuthCallback = process.argv.find((arg) => arg.startsWith('banwars://auth/callback'));
+  if (initialAuthCallback) handleAuthCallback(initialAuthCallback);
 
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;

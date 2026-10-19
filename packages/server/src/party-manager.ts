@@ -1,12 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { BanDef, PartyView, Phase, Settings, TeamId, Tier } from '@banwars/shared';
+import type { BanDef, MatchHistoryEntry, PartyView, Phase, Settings, TeamId, Tier } from '@banwars/shared';
 import { allowedPool, isMercy, tallyVotes } from './ban-engine.js';
 
 const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'; // no 0/O/1/I
 const CAP: Record<Tier, number> = { free: 5, premium: 10 };
 const MAX_SPECTATORS = 20;
 const GRACE_MS = 60_000; // rejoin window after crash / disconnect
-export const DEFAULT_SETTINGS: Settings = { mercyMargin: 7, voteSeconds: 20 };
+export const DEFAULT_SETTINGS: Settings = { mercyMargin: 7, voteSeconds: 60 };
 
 export type R<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string) => ({ ok: false as const, error });
@@ -14,7 +14,7 @@ const other = (t: TeamId): TeamId => (t === 'A' ? 'B' : 'A');
 
 interface PlayerRec {
   id: string; token: string; nick: string; team: TeamId | null;
-  role: 'player' | 'spectator'; socketId: string | null;
+  role: 'player' | 'spectator'; socketId: string | null; ready: boolean;
 }
 interface VoteState {
   winner: TeamId; deadline: number;
@@ -24,7 +24,7 @@ interface Party {
   code: string; hostId: string; tier: Tier; settings: Settings; seed: string;
   players: Map<string, PlayerRec>; phase: Phase; matchNo: number;
   bans: Record<TeamId, BanDef[]>; mercyTeam: TeamId | null;
-  lastResult: PartyView['lastResult']; vote: VoteState | null; sweep?: NodeJS.Timeout;
+  lastResult: PartyView['lastResult']; history: MatchHistoryEntry[]; vote: VoteState | null; sweep?: NodeJS.Timeout;
 }
 
 export interface Emitter {
@@ -54,8 +54,9 @@ export class PartyManager {
     return {
       code: p.code, hostId: p.hostId, tier: p.tier, settings: p.settings, phase: p.phase,
       matchNo: p.matchNo, bans: p.bans, mercyTeam: p.mercyTeam, lastResult: p.lastResult,
+      history: p.history,
       players: [...p.players.values()].map((x) => ({
-        id: x.id, nick: x.nick, team: x.team, role: x.role, connected: x.socketId !== null,
+        id: x.id, nick: x.nick, team: x.team, role: x.role, connected: x.socketId !== null, ready: x.ready,
       })),
       vote: p.vote && {
         winner: p.vote.winner, catalog: this.catalog,
@@ -73,11 +74,11 @@ export class PartyManager {
   create(nick: string, tier: Tier, socketId: string): R<{ code: string; playerId: string; token: string }> {
     const n = this.clean(nick);
     if (!n) return fail('Nickname required');
-    const host: PlayerRec = { id: randomUUID(), token: randomUUID(), nick: n, team: 'A', role: 'player', socketId };
+    const host: PlayerRec = { id: randomUUID(), token: randomUUID(), nick: n, team: 'A', role: 'player', socketId, ready: false };
     const party: Party = {
       code: this.newCode(), hostId: host.id, tier, settings: { ...DEFAULT_SETTINGS },
       seed: randomUUID(), players: new Map([[host.id, host]]), phase: 'lobby', matchNo: 0,
-      bans: { A: [], B: [] }, mercyTeam: null, lastResult: null, vote: null,
+      bans: { A: [], B: [] }, mercyTeam: null, lastResult: null, history: [], vote: null,
     };
     this.parties.set(party.code, party);
     this.bySock.set(socketId, { code: party.code, playerId: host.id });
@@ -98,7 +99,7 @@ export class PartyManager {
       const seated = [...p.players.values()].filter((x) => x.role === 'player').length;
       const full = seated >= CAP[p.tier];
       if (full && p.players.size >= CAP[p.tier] + MAX_SPECTATORS) return fail('Party and spectator list are full');
-      rec = { id: randomUUID(), token: randomUUID(), nick: n, team: null, role: full ? 'spectator' : 'player', socketId };
+      rec = { id: randomUUID(), token: randomUUID(), nick: n, team: null, role: full ? 'spectator' : 'player', socketId, ready: false };
       p.players.set(rec.id, rec);
       if (full) this.out.to(p.players.get(p.hostId)!.socketId ?? '', 'toast',
         { message: `Party limit reached (${CAP[p.tier]}). ${n} joined as spectator.` });
@@ -156,7 +157,16 @@ export class PartyManager {
     if (!p || !rec) return fail('Not in party');
     if (p.phase !== 'lobby') return fail('Teams are locked during a match');
     if (rec.role === 'spectator') return fail('Spectators cannot join a team');
-    rec.team = team; this.push(p); return { ok: true };
+    rec.team = team; rec.ready = false; this.push(p); return { ok: true };
+  }
+
+  setReady(code: string, playerId: string, ready: boolean): R {
+    const p = this.parties.get(code); const rec = p?.players.get(playerId);
+    if (!p || !rec) return fail('Not in party');
+    if (p.phase !== 'lobby') return fail('Ready status can only change in the lobby');
+    if (rec.role !== 'player' || !rec.team) return fail('Join a team before marking ready');
+    if (typeof ready !== 'boolean') return fail('Invalid ready status');
+    rec.ready = ready; this.push(p); return { ok: true };
   }
 
   kick(code: string, playerId: string, targetId: string): R {
@@ -187,6 +197,7 @@ export class PartyManager {
   startMatch(code: string, playerId: string): R {
     const h = this.host(code, playerId); if (!h.ok) return h;
     if (h.p.phase === 'voting') return fail('Wait for the ban vote to finish');
+    h.p.players.forEach((player) => { player.ready = false; });
     h.p.phase = 'inMatch'; this.push(h.p); return { ok: true };
   }
 
@@ -231,6 +242,17 @@ export class PartyManager {
     if (!ban) throw new Error(`Selected ban ${id} is missing from the catalog`);
     p.bans[loser] = [ban, ...p.bans[loser].filter((existing) => existing.id !== id)];
     p.mercyTeam = p.lastResult?.mercy ? loser : null;
+    if (p.lastResult) {
+      p.history.unshift({
+        matchNo: p.matchNo,
+        ...p.lastResult,
+        score: [...p.lastResult.score],
+        bannedTeam: loser,
+        ban,
+        completedAt: Date.now(),
+      });
+      p.history = p.history.slice(0, 20);
+    }
     p.vote = null; p.phase = 'lobby';
     this.out.event(p.code, 'ban:applied', { team: loser, bans: [ban] });
     this.push(p);
