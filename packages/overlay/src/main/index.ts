@@ -28,7 +28,7 @@ function createOverlay() {
 }
 
 function createPanel() {
-  const title = `Ban Wars v${app.getVersion()}`;
+  const title = `Ban Wars v.${app.getVersion()}`;
   panel = new BrowserWindow({
     width: 380, height: 720, minWidth: 340, backgroundColor: '#4a4a4a', title, autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, sandbox: false },
