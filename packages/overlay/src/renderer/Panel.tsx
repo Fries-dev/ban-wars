@@ -148,6 +148,8 @@ export default function Panel() {
   const [screen, setScreen] = useState<Screen>('home');
   const previousScreen = useRef<Screen>('home');
   const [version, setVersion] = useState('');
+  const [autoDetectWins, setAutoDetectWins] = useState(false);
+  const [winDetectionError, setWinDetectionError] = useState('');
   const [nick, setNick] = useState(localStorage.getItem('bw.nick') ?? '');
   const [team, setTeam] = useState<TeamId>('A');
   const [code, setCode] = useState('');
@@ -161,7 +163,6 @@ export default function Panel() {
   const [authLoaded, setAuthLoaded] = useState(!supabase);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const processedAuthCallbacks = useRef(new Set<string>());
-  const score: [number, number] = [0, 0];
   const [displays, setDisplays] = useState<Awaited<ReturnType<typeof window.bw.displays>>>([]);
   useEffect(() => { window.bw.displays().then(setDisplays); }, []);
   useEffect(() => {
@@ -169,6 +170,14 @@ export default function Panel() {
       console.error('Could not read app version:', error);
       setErr(error instanceof Error ? error.message : 'Could not read app version.');
     });
+  }, []);
+  useEffect(() => {
+    const unsubscribe = window.bw.onWinDetectionError((message) => setWinDetectionError(message ?? ''));
+    void window.bw.getAutoDetectWins().then(setAutoDetectWins).catch((error: unknown) => {
+      console.error('Could not read automatic win detection setting:', error);
+      setErr(error instanceof Error ? error.message : 'Could not read automatic win detection setting.');
+    });
+    return unsubscribe;
   }, []);
   useEffect(() => {
     const client = supabase;
@@ -382,7 +391,7 @@ export default function Panel() {
     const winsA = party?.history.filter((match) => match.winner === 'A').length ?? 0;
     const winsB = party?.history.filter((match) => match.winner === 'B').length ?? 0;
     const rows = party?.history.map((match) =>
-      `Match ${match.matchNo}: Team ${match.winner} won ${match.score.join('-')}; Team ${match.bannedTeam} banned ${match.ban.label}${match.mercy ? ' (mercy)' : ''}`,
+      `Match ${match.matchNo}: Team ${match.winner} won${match.score ? ` ${match.score.join('-')}` : ''}; Team ${match.bannedTeam} banned ${match.ban.label}${match.mercy ? ' (mercy)' : ''}`,
     ) ?? [];
     return copyInvite(
       [`Ban Wars party ${party?.code ?? ''} results`, `Team A ${winsA} - ${winsB} Team B`, ...rows].join('\n'),
@@ -397,6 +406,16 @@ export default function Panel() {
       console.error('Could not control panel window:', error);
       setErr(error instanceof Error ? error.message : 'Could not control panel window.');
     });
+  };
+  const changeAutoDetectWins = async (enabled: boolean) => {
+    try {
+      await window.bw.setAutoDetectWins(enabled);
+      setAutoDetectWins(enabled);
+      setWinDetectionError('');
+    } catch (error) {
+      console.error('Could not update automatic win detection setting:', error);
+      setErr(error instanceof Error ? error.message : 'Could not update automatic win detection setting.');
+    }
   };
   const shellProps = { online, everConnected, version, onWindowControl, onLegal: (target: 'privacy' | 'terms') => go(target) };
 
@@ -416,6 +435,8 @@ export default function Panel() {
                 <p>App preferences are stored on your device. A party rejoin session is encrypted using your operating system's secure storage. Party state is held by the Ban Wars server in memory while the server is running.</p>
                 <h3>Payments and Premium</h3>
                 <p>This app build does not include subscription checkout or collect payment card details. Before enabling monthly Premium purchases, identify the payment provider and document what billing information it processes, how long it retains it, and how users can contact you about privacy.</p>
+                <h3>Optional screenshot win detection</h3>
+                <p>If the host enables automatic win detection, Ban Wars captures the selected game monitor only while a party match is active. Screenshot text is processed locally with the bundled English OCR model; images are not saved or sent to Ban Wars servers. The detected winner is sent to the party server to update the shared score.</p>
                 <h3>Sharing and contact</h3>
                 <p>Party members can see player names, teams, and activity in their party. Supabase and the Ban Wars server provide account and multiplayer services. Add a monitored privacy contact address and any applicable data-request process before release.</p>
               </>
@@ -427,6 +448,8 @@ export default function Panel() {
                 <p>The current app build does not implement subscription checkout, renewal, or cancellation. Before selling Premium, specify the seller's legal name and contact, the plan price and currency, monthly renewal terms, when charges occur, how and when cancellation takes effect, refund rules, and any trial or tax terms. Show these details before purchase and use the actual payment provider's cancellation process.</p>
                 <h3>Availability and account actions</h3>
                 <p>The service may be updated or temporarily unavailable. Accounts or parties that abuse the service may be restricted. Explain any material limits on Premium features here before taking payment.</p>
+                <h3>Automatic match results</h3>
+                <p>Automatic win detection is optional and must be enabled by the party host in Settings. It reads the visible end-of-match result on the selected monitor; it may miss or misread a result and is not an official Ubisoft result feed. Review the shared score and use the host's manual result controls if detection fails.</p>
                 <h3>Legal review</h3>
                 <p>This draft is general product text, not legal advice. Have the final terms reviewed for your location and the locations where you offer subscriptions, including applicable consumer and recurring-payment requirements.</p>
               </>
@@ -476,6 +499,11 @@ export default function Panel() {
           <select defaultValue={displays.find((d) => d.selected)?.id} onChange={(e) => window.bw.setDisplay(+e.target.value)}>
             {displays.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
           </select>
+          <label className="chk">Automatic win detection (host only)
+            <input type="checkbox" checked={autoDetectWins} onChange={(e) => void changeAutoDetectWins(e.target.checked)} />
+          </label>
+          <div className="muted">When enabled, Ban Wars checks the selected monitor every 3 seconds during your active match. Screenshots are processed locally and are not saved or uploaded.</div>
+          {winDetectionError && <div className="err">{winDetectionError}</div>}
           <div className="label">UI SCALE {prefs.scale.toFixed(1)}×</div>
           <input type="range" min={0.7} max={1.8} step={0.1} value={prefs.scale} onChange={(e) => pref('bw.scale', e.target.value)} />
           <label className="chk">High-contrast colorblind mode<input type="checkbox" checked={prefs.colorblind} onChange={(e) => pref('bw.cb', e.target.checked ? '1' : '0')} /></label>
@@ -504,7 +532,7 @@ export default function Panel() {
           </button>
           <div className="muted" style={{ textAlign: 'center' }}>
             {party.phase.toUpperCase()} · Match #{party.matchNo + 1}
-            {party.lastResult && ` · Last: Team ${party.lastResult.winner} ${party.lastResult.score.join('-')}${party.lastResult.mercy ? ' (MERCY)' : ''}`}
+            {party.lastResult && ` · Last: Team ${party.lastResult.winner}${party.lastResult.score ? ` ${party.lastResult.score.join('-')}` : ''}${party.lastResult.mercy ? ' (MERCY)' : ''}`}
           </div>
           {self?.role === 'player' && (
             <div className="teams">
@@ -534,20 +562,20 @@ export default function Panel() {
           ))}
         </div>
 
+        <div className="panel">
+          <div className="label">PARTY WINS</div>
+          <div className="muted">Team A: {party.wins.A} {' · '} Team B: {party.wins.B}</div>
+        </div>
+
         {party.history.length > 0 && (
           <div className="panel">
             <div className="label">RECENT MATCH HISTORY</div>
-            <div className="muted">
-              Team A wins: {party.history.filter((match) => match.winner === 'A').length}
-              {' · '}
-              Team B wins: {party.history.filter((match) => match.winner === 'B').length}
-            </div>
             <button className="btn grey small" disabled={!party.history.length} onClick={() => void copyMatchSummary()}>
               {inviteCopied === 'Results copied!' ? 'Results copied!' : 'Copy results'}
             </button>
             {party.history.slice(0, 10).map((match) => (
               <div className="history-row" key={`${match.matchNo}-${match.completedAt}`}>
-                <span className="history-result">#{match.matchNo} · Team {match.winner} {match.score.join('-')}</span>
+                <span className="history-result">#{match.matchNo} · Team {match.winner} won{match.score ? ` ${match.score.join('-')}` : ''}</span>
                 <span className="muted">Team {match.bannedTeam}: {match.ban.label}{match.mercy ? ' · MERCY' : ''}</span>
               </div>
             ))}
@@ -563,8 +591,8 @@ export default function Panel() {
             </div>
             {party.phase === 'inMatch' && (
               <div className="row">
-                <button className="btn green small" onClick={() => call('match:result', { winner: 'A', score })}>Team A won</button>
-                <button className="btn green small" onClick={() => call('match:result', { winner: 'B', score })}>Team B won</button>
+                <button className="btn green small" onClick={() => call('match:result', { winner: 'A' })}>Team A won</button>
+                <button className="btn green small" onClick={() => call('match:result', { winner: 'B' })}>Team B won</button>
               </div>
             )}
             <div className="row">

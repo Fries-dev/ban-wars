@@ -29,6 +29,8 @@ Party invites can be copied as a code or as a web link. Opening the invite link 
 
 Players can mark themselves ready in the lobby after joining a team. Ready status is informational, clears when a match starts or a player changes teams, and does not prevent the host from starting. Match history can be copied from the lobby as a plain-text results summary.
 
+The host can enable optional automatic win detection in Settings. While a party match is active, Ban Wars captures the selected monitor every three seconds and uses its bundled English OCR model locally to look for the end-of-match Victory/Defeat screen. Screenshots are not saved or uploaded; only the detected winner is sent to the party server. Detection may miss results, so the manual winner buttons remain available.
+
 ## Sign-in setup
 
 Sign-in uses Supabase Auth (free tier) for Google, Apple, and email/password accounts. Apple sign-in also requires Apple provider credentials, which may require membership in Apple's paid developer program.

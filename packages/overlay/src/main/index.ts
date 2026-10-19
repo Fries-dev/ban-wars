@@ -8,6 +8,7 @@ const SERVER_URL = process.env.BW_SERVER ?? 'http://localhost:3001';
 let overlay: BrowserWindow; let panel: BrowserWindow; let interactive = false;
 let pendingAuthCallback: string | null = null;
 let pendingPartyCode: string | null = null;
+let updateMatchDetection: (() => void) | undefined;
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 function handleAuthCallback(url: string) {
@@ -59,7 +60,9 @@ app.on('second-instance', (_event, commandLine) => {
 });
 
 const settingsFile = () => join(app.getPath('userData'), 'settings.json');
-const loadSettings = (): { displayId?: number } => { try { return JSON.parse(readFileSync(settingsFile(), 'utf8')); } catch { return {}; } };
+type AppSettings = { displayId?: number; autoDetectWins?: boolean };
+const loadSettings = (): AppSettings => { try { return JSON.parse(readFileSync(settingsFile(), 'utf8')); } catch { return {}; } };
+const saveSettings = (settings: AppSettings) => writeFileSync(settingsFile(), JSON.stringify(settings));
 const gameDisplay = () => screen.getAllDisplays().find((d) => d.id === loadSettings().displayId) ?? screen.getPrimaryDisplay();
 
 function load(win: BrowserWindow, hash: string) {
@@ -112,7 +115,10 @@ app.whenReady().then(() => {
     app.setAsDefaultProtocolClient('banwars');
   }
   createOverlay(); createPanel();
-  startSync(SERVER_URL, () => [overlay, panel]);
+  updateMatchDetection = startSync(SERVER_URL, () => [overlay, panel], () => ({
+    enabled: loadSettings().autoDetectWins === true,
+    displayId: gameDisplay().id,
+  }));
   globalShortcut.register('F10', toggleInteractive); // F10 toggles click-through (use borderless windowed in-game)
 
   ipcMain.handle('bw:openAuthUrl', async (_event, value: string) => {
@@ -143,6 +149,16 @@ app.whenReady().then(() => {
     else if (action === 'close') panel.close();
     else throw new TypeError('Unknown panel window action');
   });
+  ipcMain.handle('bw:getAutoDetectWins', (event) => {
+    if (event.sender !== panel.webContents) throw new Error('Win detection settings may only be read by the panel');
+    return loadSettings().autoDetectWins === true;
+  });
+  ipcMain.handle('bw:setAutoDetectWins', (event, enabled: unknown) => {
+    if (event.sender !== panel.webContents) throw new Error('Win detection settings may only be changed by the panel');
+    if (typeof enabled !== 'boolean') throw new TypeError('Automatic win detection setting must be boolean');
+    saveSettings({ ...loadSettings(), autoDetectWins: enabled });
+    updateMatchDetection?.();
+  });
   ipcMain.handle('bw:resetOverlayPosition', () => {
     if (!overlay.isDestroyed()) overlay.webContents.send('bw:reset-overlay-position');
   });
@@ -150,8 +166,9 @@ app.whenReady().then(() => {
   ipcMain.handle('bw:displays', () =>
     screen.getAllDisplays().map((d, i) => ({ id: d.id, label: `Display ${i + 1} (${d.size.width}x${d.size.height})`, selected: d.id === gameDisplay().id })));
   ipcMain.handle('bw:setDisplay', (_e, id: number) => {
-    writeFileSync(settingsFile(), JSON.stringify({ ...loadSettings(), displayId: id }));
+    saveSettings({ ...loadSettings(), displayId: id });
     overlay.setBounds(gameDisplay().bounds);
+    updateMatchDetection?.();
   });
 
   const initialProtocolUrl = process.argv.find((arg) => arg.startsWith('banwars://'));

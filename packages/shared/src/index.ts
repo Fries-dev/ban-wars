@@ -34,7 +34,7 @@ export interface VoteView {
 export interface MatchHistoryEntry {
   matchNo: number;
   winner: TeamId;
-  score: [number, number];
+  score: [number, number] | null;
   mercy: boolean;
   bannedTeam: TeamId;
   ban: BanDef;
@@ -44,9 +44,10 @@ export interface MatchHistoryEntry {
 export interface PartyView {
   code: string; hostId: string; tier: Tier; settings: Settings;
   players: PlayerView[]; phase: Phase; matchNo: number;
+  wins: Record<TeamId, number>;
   bans: Record<TeamId, BanDef[]>;       // accumulated restrictions for each team
   mercyTeam: TeamId | null;             // team holding an unused mercy unban
-  lastResult: { winner: TeamId; score: [number, number]; mercy: boolean } | null;
+  lastResult: { winner: TeamId; score: [number, number] | null; mercy: boolean } | null;
   history: MatchHistoryEntry[];
   vote: VoteView | null;
   serverNow: number;
@@ -64,7 +65,7 @@ export interface ClientEvents {
   'party:settings': Partial<Settings>;
   'party:reset': object;
   'match:start': object;
-  'match:result': { winner: TeamId; score: [number, number] };
+  'match:result': { winner: TeamId; score?: [number, number] };
   'vote:cast': { banId: string };
   'mercy:unban': { banId: string };
 }

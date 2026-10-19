@@ -30,6 +30,9 @@ declare global {
       copyText: (text: string) => Promise<void>;
       panelVersion: () => Promise<string>;
       panelControl: (action: 'minimize' | 'close') => Promise<void>;
+      getAutoDetectWins: () => Promise<boolean>;
+      setAutoDetectWins: (enabled: boolean) => Promise<void>;
+      onWinDetectionError: Sub<string | null>;
       onResetOverlayPosition: Sub<void>;
       resetOverlayPosition: () => Promise<void>;
       displays: () => Promise<{ id: number; label: string; selected: boolean }[]>;

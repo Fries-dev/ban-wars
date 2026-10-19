@@ -10,6 +10,25 @@ describe('PartyManager accumulated bans', () => {
     expect(DEFAULT_SETTINGS.voteSeconds).toBe(60);
   });
 
+  it('increments the winning team total as soon as the host reports the result', () => {
+    const manager = new PartyManager(catalog, {
+      state: vi.fn(),
+      event: vi.fn(),
+      to: vi.fn(),
+    });
+    const created = manager.create('Host', 'free', 'host-socket');
+    if (!created.ok) throw new Error(created.error);
+
+    expect(manager.snapshot(created.code)?.wins).toEqual({ A: 0, B: 0 });
+    expect(manager.startMatch(created.code, created.playerId).ok).toBe(true);
+    expect(manager.reportResult(created.code, created.playerId, 'B').ok).toBe(true);
+    expect(manager.snapshot(created.code)?.wins).toEqual({ A: 0, B: 1 });
+    expect(manager.snapshot(created.code)?.lastResult).toEqual({ winner: 'B', score: null, mercy: false });
+
+    expect(manager.reportResult(created.code, created.playerId, 'A', [0, 0]).ok).toBe(false);
+    expect(manager.snapshot(created.code)?.wins).toEqual({ A: 0, B: 1 });
+  });
+
   it('keeps bans from earlier rounds until the host resets the party', () => {
     const manager = new PartyManager(catalog, {
       state: vi.fn(),

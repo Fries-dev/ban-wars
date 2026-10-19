@@ -1,11 +1,16 @@
 import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
 import { io } from 'socket.io-client';
-import type { PartyView } from '@banwars/shared';
+import type { PartyView, TeamId } from '@banwars/shared';
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ScreenshotMatchSource, type MatchDetectionOptions } from './match-source';
 
 /** The socket lives in the main process; both windows are just views fed over IPC. */
-export function startSync(serverUrl: string, windows: () => BrowserWindow[]) {
+export function startSync(
+  serverUrl: string,
+  windows: () => BrowserWindow[],
+  getDetectionSettings: () => Pick<MatchDetectionOptions, 'enabled' | 'displayId'>,
+) {
   const socket = io(serverUrl, { reconnection: true, reconnectionDelay: 500, reconnectionDelayMax: 5000 });
   const sessionFile = join(app.getPath('userData'), 'party-session.json');
   type Session = { code: string; nick: string; token: string; playerId: string };
@@ -57,32 +62,81 @@ export function startSync(serverUrl: string, windows: () => BrowserWindow[]) {
   const send = (ch: string, data: unknown) =>
     windows().forEach((w) => !w.isDestroyed() && w.webContents.send(ch, data));
 
-  socket.on('party:state', (s: PartyView) => { lastState = s; send('party:state', s); });
+  const matchSource = new ScreenshotMatchSource((result) => new Promise((resolve) => {
+    if (!socket.connected) {
+      matchSource.setError('The server is offline. Automatic result reporting will retry when connected.');
+      resolve(false);
+      return;
+    }
+    socket.timeout(5000).emit('match:result', result, (error: unknown, response: { ok: boolean; error?: string }) => {
+      if (error) {
+        matchSource.setError('The server did not respond to the automatic result. Detection will retry.');
+        resolve(false);
+      } else if (!response.ok) {
+        matchSource.setError(response.error ?? 'The server rejected the automatic result.');
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  }), (message) => send('bw:win-detection-error', message));
+  const updateMatchDetection = () => {
+    const settings = getDetectionSettings();
+    const hostPlayer = lastState?.players.find((player) => player.id === session?.playerId);
+    const activeHostMatch = !!session && socket.connected
+      && lastState?.hostId === session.playerId && lastState.phase === 'inMatch';
+    const team: TeamId | null = activeHostMatch ? hostPlayer?.team ?? null : null;
+    matchSource.update({ ...settings, active: activeHostMatch, team });
+  };
+
+  socket.on('party:state', (s: PartyView) => {
+    lastState = s;
+    send('party:state', s);
+    updateMatchDetection();
+  });
   for (const name of ['ban:applied', 'ban:removed', 'toast', 'party:kicked'])
     socket.on(name, (payload: unknown) => {
-      if (name === 'party:kicked') { persistSession(null); lastState = null; send('bw:session', null); }
+      if (name === 'party:kicked') {
+        persistSession(null);
+        lastState = null;
+        send('bw:session', null);
+        updateMatchDetection();
+      }
       send('party:event', { name, payload });
     });
 
-  socket.on('connect', () => send('bw:conn', true));
-  socket.on('disconnect', () => send('bw:conn', false));
+  socket.on('connect', () => { send('bw:conn', true); updateMatchDetection(); });
+  socket.on('disconnect', () => { send('bw:conn', false); updateMatchDetection(); });
   socket.on('connect_error', () => send('bw:conn', false));
 
   // Auto-rejoin with the saved token after reconnects (crash, wifi blip, server restart within grace window).
   socket.on('connect', () => {
     if (!session) return;
     socket.emit('party:join', { code: session.code, nick: session.nick, token: session.token },
-      (r: { ok: boolean }) => { if (!r.ok) { persistSession(null); lastState = null; send('bw:session', null); } });
+      (r: { ok: boolean }) => {
+        if (!r.ok) {
+          persistSession(null);
+          lastState = null;
+          send('bw:session', null);
+          updateMatchDetection();
+        }
+      });
   });
 
   ipcMain.handle('bw:emit', (_e, event: string, payload: Record<string, unknown>) =>
     new Promise((resolve) => {
       socket.timeout(5000).emit(event, payload, (err: unknown, r: any) => {
         if (err) return resolve({ ok: false, error: 'Cannot reach server. Is it running?' });
-        if (event === 'party:leave') { persistSession(null); lastState = null; send('bw:session', null); }
+        if (event === 'party:leave') {
+          persistSession(null);
+          lastState = null;
+          send('bw:session', null);
+          updateMatchDetection();
+        }
         if (r?.ok && (event === 'party:create' || event === 'party:join')) {
           persistSession({ code: r.code, nick: String(payload.nick), token: r.token, playerId: r.playerId });
           send('bw:session', { code: r.code, playerId: r.playerId });
+          updateMatchDetection();
         }
         resolve(r);
       });
@@ -90,4 +144,6 @@ export function startSync(serverUrl: string, windows: () => BrowserWindow[]) {
   ipcMain.handle('bw:getSession', () => session && { code: session.code, playerId: session.playerId });
   ipcMain.handle('bw:getConn', () => socket.connected);
   ipcMain.handle('bw:getState', () => lastState);
+  app.on('will-quit', () => { void matchSource.stop(); });
+  return updateMatchDetection;
 }

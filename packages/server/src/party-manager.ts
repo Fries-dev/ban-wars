@@ -22,7 +22,7 @@ interface VoteState {
 }
 interface Party {
   code: string; hostId: string; tier: Tier; settings: Settings; seed: string;
-  players: Map<string, PlayerRec>; phase: Phase; matchNo: number;
+  players: Map<string, PlayerRec>; phase: Phase; matchNo: number; wins: Record<TeamId, number>;
   bans: Record<TeamId, BanDef[]>; mercyTeam: TeamId | null;
   lastResult: PartyView['lastResult']; history: MatchHistoryEntry[]; vote: VoteState | null; sweep?: NodeJS.Timeout;
 }
@@ -54,7 +54,7 @@ export class PartyManager {
     const bannedBanIds = [...new Set([...p.bans.A, ...p.bans.B].map((ban) => ban.id))];
     return {
       code: p.code, hostId: p.hostId, tier: p.tier, settings: p.settings, phase: p.phase,
-      matchNo: p.matchNo, bans: p.bans, mercyTeam: p.mercyTeam, lastResult: p.lastResult,
+      matchNo: p.matchNo, wins: { ...p.wins }, bans: p.bans, mercyTeam: p.mercyTeam, lastResult: p.lastResult,
       history: p.history,
       players: [...p.players.values()].map((x) => ({
         id: x.id, nick: x.nick, team: x.team, role: x.role, connected: x.socketId !== null, ready: x.ready,
@@ -80,7 +80,7 @@ export class PartyManager {
     const party: Party = {
       code: this.newCode(), hostId: host.id, tier, settings: { ...DEFAULT_SETTINGS },
       seed: randomUUID(), players: new Map([[host.id, host]]), phase: 'lobby', matchNo: 0,
-      bans: { A: [], B: [] }, mercyTeam: null, lastResult: null, history: [], vote: null,
+      wins: { A: 0, B: 0 }, bans: { A: [], B: [] }, mercyTeam: null, lastResult: null, history: [], vote: null,
     };
     this.parties.set(party.code, party);
     this.bySock.set(socketId, { code: party.code, playerId: host.id });
@@ -208,14 +208,18 @@ export class PartyManager {
   }
 
   /** Called by host (manual) or by the stats-API poller once wired. */
-  reportResult(code: string, playerId: string, winner: TeamId, score: [number, number]): R {
+  reportResult(code: string, playerId: string, winner: TeamId, score?: [number, number]): R {
     const h = this.host(code, playerId); if (!h.ok) return h;
     const p = h.p;
     if (p.phase !== 'inMatch') return fail('No match in progress');
-    if (!Array.isArray(score) || score.some((n) => !Number.isInteger(n) || n < 0 || n > 99)) return fail('Bad score');
-    const mercy = isMercy(score, winner, p.settings.mercyMargin);
+    if (winner !== 'A' && winner !== 'B') return fail('Bad winner');
+    if (score !== undefined
+      && (!Array.isArray(score) || score.length !== 2 || score.some((n) => !Number.isInteger(n) || n < 0 || n > 99))) return fail('Bad score');
+    const recordedScore: [number, number] | null = score ? [score[0], score[1]] : null;
+    const mercy = recordedScore ? isMercy(recordedScore, winner, p.settings.mercyMargin) : false;
     p.matchNo += 1;
-    p.lastResult = { winner, score, mercy };
+    p.wins[winner] += 1;
+    p.lastResult = { winner, score: recordedScore, mercy };
     p.mercyTeam = null;
     p.phase = 'voting';
     const deadline = Date.now() + p.settings.voteSeconds * 1000;
@@ -254,7 +258,7 @@ export class PartyManager {
       p.history.unshift({
         matchNo: p.matchNo,
         ...p.lastResult,
-        score: [...p.lastResult.score],
+        score: p.lastResult.score ? [...p.lastResult.score] : null,
         bannedTeam: loser,
         ban,
         completedAt: Date.now(),
