@@ -13,7 +13,7 @@ Run Siege in borderless windowed mode. F10 toggles overlay click-through.
 
 ## Public multiplayer server (Railway)
 
-The server is configured for Railway using the repository-root `railway.json`. In Railway, create a project from this GitHub repository and deploy from the repository root. Railway installs the server's runtime dependencies and uses `/health` for its health check. Generate a public domain in the Railway service's Networking settings; the app server URL should be `https://<your-domain>` (no path or trailing slash).
+The server is configured for Railway using the repository-root `railway.json`. In Railway, create a project from this GitHub repository and deploy from the repository root. Railway installs the workspace dependencies using its standard install step (do not add a second `npm ci` build command). `.nvmrc` selects Node 20. Railway uses `/health` for its health check. Generate a public domain in the Railway service's Networking settings; the app server URL should be `https://<your-domain>` (no path or trailing slash).
 
 Before publishing a Windows release, add these **repository Actions variables** under GitHub **Settings → Secrets and variables → Actions → Variables**:
 
